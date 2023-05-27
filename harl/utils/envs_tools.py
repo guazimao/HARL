@@ -35,9 +35,13 @@ def get_shape_from_act_space(act_space):
     Returns:
         act_shape: (tuple) action shape
     """
-    if act_space.__class__.__name__ == "Discrete":
+    if act_space.__class__.__name__ == 'Discrete':
         act_shape = 1
+    elif act_space.__class__.__name__ == "MultiDiscrete":
+        act_shape = act_space.shape[0]
     elif act_space.__class__.__name__ == "Box":
+        act_shape = act_space.shape[0]
+    elif act_space.__class__.__name__ == "MultiBinary":
         act_shape = act_space.shape[0]
     return act_shape
 
@@ -85,6 +89,10 @@ def make_train_env(env_name, seed, n_threads, env_args):
                 from harl.envs.football.football_env import FootballEnv
 
                 env = FootballEnv(env_args)
+            elif env_name == "jsbsim":
+                from harl.envs.jsbsim.jsbsim_env import JSBSimEnv
+
+                env = JSBSimEnv(env_args)
             else:
                 print("Can not support the " + env_name + "environment.")
                 raise NotImplementedError
@@ -134,6 +142,10 @@ def make_eval_env(env_name, seed, n_threads, env_args):
                 from harl.envs.football.football_env import FootballEnv
 
                 env = FootballEnv(env_args)
+            elif env_name == "jsbsim":
+                from harl.envs.jsbsim.jsbsim_env import JSBSimEnv
+
+                env = JSBSimEnv(env_args)
             else:
                 print("Can not support the " + env_name + "environment.")
                 raise NotImplementedError
@@ -198,6 +210,11 @@ def make_render_env(env_name, seed, env_args):
         manual_expand_dims = False  # dexhands uses parallel envs, thus dimension is already expanded
         manual_delay = False
         env_num = 64
+    elif env_name == "jsbsim":
+        from harl.envs.jsbsim.jsbsim_env import JSBSimEnv
+
+        env = JSBSimEnv(env_args)
+        env.seed(seed * 60000)
     else:
         print("Can not support the " + env_name + "environment.")
         raise NotImplementedError
@@ -233,4 +250,6 @@ def get_num_agents(env, env_args, envs):
     elif env == "football":
         return envs.n_agents
     elif env == "dexhands":
+        return envs.n_agents
+    elif env == "jsbsim":
         return envs.n_agents

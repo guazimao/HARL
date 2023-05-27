@@ -1,0 +1,2 @@
+task: MultipleCombat # SingleCombat, SingleControl, MultipleCombat
+scenario: 2v2/ShootMissile/HierarchyVsBaseline # 2v2/NoWeapon/vsBaseline, 2v2/ShootMissile/HierarchyVsBaseline

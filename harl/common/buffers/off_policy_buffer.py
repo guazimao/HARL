@@ -24,6 +24,7 @@ class OffPolicyBuffer:
         self.cur_size = 0  # current occupied size of buffer
         self.idx = 0  # current index to insert
         self.num_agents = num_agents
+        self.act_spaces = act_spaces
 
         # get shapes of share obs, obs, and actions
         share_obs_shape = get_shape_from_obs_space(share_obs_space)
@@ -56,12 +57,19 @@ class OffPolicyBuffer:
         # Buffer for rewards received by agents at each timestep
         self.rewards = np.zeros((self.buffer_size, 1), dtype=np.float32)
 
-        # Buffer for actions taken by agents at each timestep
+        # Buffer for actions and available actions taken by agents at each timestep
         self.actions = []
+        self.available_actions = []
+        self.next_available_actions = []
         for agent_id in range(num_agents):
             self.actions.append(
                 np.zeros((self.buffer_size, act_shapes[agent_id]), dtype=np.float32)
             )
+            if act_spaces[agent_id].__class__.__name__ == 'Discrete':
+                self.available_actions.append(np.zeros(
+                    (self.buffer_size, act_spaces[agent_id].n), dtype=np.float32))
+                self.next_available_actions.append(np.zeros(
+                    (self.buffer_size, act_spaces[agent_id].n), dtype=np.float32))
 
         # Buffer for done and termination flags
         self.dones = np.full((self.buffer_size, 1), False)
@@ -73,14 +81,16 @@ class OffPolicyBuffer:
             data: a tuple of (share_obs, obs, action, reward, done, term, next_share_obs, next_obs)
             share_obs: (n_rollout_threads, *share_obs_shape)
             obs: [(n_rollout_threads, *obs_shapes[agent_id]) for agent_id in range(num_agents)]
-            action: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
+            actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
+            available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
             reward: (n_rollout_threads, 1)
             done: (n_rollout_threads, 1)
             term: (n_rollout_threads, 1)
             next_share_obs: (n_rollout_threads, *share_obs_shape)
             next_obs: [(n_rollout_threads, *obs_shapes[agent_id]) for agent_id in range(num_agents)]
+            next_available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
         """
-        share_obs, obs, actions, reward, done, term, next_share_obs, next_obs = data
+        share_obs, obs, actions, available_actions, reward, done, term, next_share_obs, next_obs, next_available_actions = data
         length = share_obs.shape[0]
         if self.idx + length <= self.buffer_size:  # no overflow
             s = self.idx
@@ -93,6 +103,9 @@ class OffPolicyBuffer:
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id].copy()
                 self.actions[agent_id][s:e] = actions[agent_id].copy()
+                if self.act_spaces[agent_id].__class__.__name__ == 'Discrete':
+                    self.available_actions[agent_id][s:e] = available_actions[agent_id].copy()
+                    self.next_available_actions[agent_id][s:e] = next_available_actions[agent_id].copy()
                 self.next_obs[agent_id][s:e] = next_obs[agent_id].copy()
         else:  # overflow
             len1 = self.buffer_size - self.idx  # length of first segment
@@ -109,6 +122,9 @@ class OffPolicyBuffer:
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id][0:len1].copy()
                 self.actions[agent_id][s:e] = actions[agent_id][0:len1].copy()
+                if self.act_spaces[agent_id].__class__.__name__ == 'Discrete':
+                    self.available_actions[agent_id][s:e] = available_actions[agent_id][0:len1].copy()
+                    self.next_available_actions[agent_id][s:e] = next_available_actions[agent_id][0:len1].copy()
                 self.next_obs[agent_id][s:e] = next_obs[agent_id][0:len1].copy()
 
             # insert second segment
@@ -122,6 +138,9 @@ class OffPolicyBuffer:
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id][len1:length].copy()
                 self.actions[agent_id][s:e] = actions[agent_id][len1:length].copy()
+                if self.act_spaces[agent_id].__class__.__name__ == 'Discrete':
+                    self.available_actions[agent_id][s:e] = available_actions[agent_id][len1:length].copy()
+                    self.next_available_actions[agent_id][s:e] = next_available_actions[agent_id][len1:length].copy()
                 self.next_obs[agent_id][s:e] = next_obs[agent_id][len1:length].copy()
         
         self.idx = (self.idx + length) % self.buffer_size  # update index
@@ -133,11 +152,13 @@ class OffPolicyBuffer:
             sp_share_obs: (batch_size, *dim)
             sp_obs: (n_agents, batch_size, *dim)
             sp_actions: (n_agents, batch_size, *dim)
+            sp_available_actions: (n_agents, batch_size, *dim)
             sp_reward: (batch_size, 1)
             sp_done: (batch_size, 1)
             sp_term: (batch_size, 1)
             sp_next_share_obs: (batch_size, *dim)
             sp_next_obs: (n_agents, batch_size, *dim)
+            sp_next_available_actions: (n_agents, batch_size, *dim)
         """
         self.update_end_flag()  # update the current end flag
         indice = torch.randperm(self.cur_size).numpy()[: self.batch_size]  # sample indice
@@ -148,6 +169,9 @@ class OffPolicyBuffer:
         sp_actions = np.array(
             [self.actions[agent_id][indice] for agent_id in range(self.num_agents)]
         )
+        if self.act_spaces[0].__class__.__name__ == 'Discrete':
+            sp_available_actions = np.array([self.available_actions[agent_id][indice]
+                                             for agent_id in range(self.num_agents)])
 
         # compute the indices along n steps
         indices = [indice]
@@ -161,6 +185,9 @@ class OffPolicyBuffer:
         sp_next_obs = np.array(
             [self.next_obs[agent_id][indices[-1]] for agent_id in range(self.num_agents)]
         )
+        if self.act_spaces[0].__class__.__name__ == 'Discrete':
+            sp_next_available_actions = np.array(
+                [self.next_available_actions[agent_id][indices[-1]] for agent_id in range(self.num_agents)])
 
         # compute accumulated rewards and the corresponding gamma
         gamma_buffer = np.ones(self.n_step + 1)
@@ -174,18 +201,35 @@ class OffPolicyBuffer:
             sp_reward[self.end_flag[now] > 0] = 0.0
             sp_reward = self.rewards[now] + self.gamma * sp_reward
         sp_gamma = gamma_buffer[gammas].reshape(self.batch_size, 1)
-        
-        return (
-            sp_share_obs,
-            sp_obs,
-            sp_actions,
-            sp_reward,
-            sp_done,
-            sp_term,
-            sp_next_share_obs,
-            sp_next_obs,
-            sp_gamma,
-        )
+
+        if self.act_spaces[0].__class__.__name__ == 'Discrete':
+            return (
+                sp_share_obs,
+                sp_obs,
+                sp_actions,
+                sp_available_actions,
+                sp_reward,
+                sp_done,
+                sp_term,
+                sp_next_share_obs,
+                sp_next_obs,
+                sp_next_available_actions,
+                sp_gamma
+            )
+        else:
+            return (
+                sp_share_obs,
+                sp_obs,
+                sp_actions,
+                None,
+                sp_reward,
+                sp_done,
+                sp_term,
+                sp_next_share_obs,
+                sp_next_obs,
+                None,
+                sp_gamma,
+            )
 
     def next(self, indices):
         """Get next indices"""
