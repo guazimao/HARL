@@ -4,6 +4,7 @@ import time
 import torch
 import numpy as np
 import setproctitle
+from harl.common.popart import PopArt
 from torch.distributions import Categorical
 from harl.utils.trans_tools import _t2n
 from harl.utils.envs_tools import (
@@ -142,6 +143,11 @@ class OffPolicyBaseRunner:
                 self.envs.action_space,
             )
 
+        if self.algo_args['train']['use_popart'] is True:
+            self.value_normalizer = PopArt(1, device=self.device)
+        else:
+            self.value_normalizer = None
+
         if self.algo_args['train']['model_dir'] is not None:
             self.restore()
 
@@ -203,32 +209,18 @@ class OffPolicyBaseRunner:
                         next_share_obs[i] = infos[i][0]["original_state"].copy()
             reward = reward[:, 0]
             done = np.expand_dims(np.all(done, axis=1), axis=-1)
-            if self.envs.action_space[0].__class__.__name__ == "Discrete":
-                data = (
-                    share_obs[:, 0],
-                    obs.transpose(1, 0, 2),
-                    actions.transpose(1, 0, 2),
-                    available_actions.transpose(1, 0, 2),
-                    reward,
-                    done,
-                    terms,
-                    next_share_obs[:, 0],
-                    next_obs.transpose(1, 0, 2),
-                    next_available_actions.transpose(1, 0, 2)
-                )
-            else:
-                data = (
-                    share_obs[:, 0],
-                    obs.transpose(1, 0, 2),
-                    actions.transpose(1, 0, 2),
-                    None,
-                    reward,
-                    done,
-                    terms,
-                    next_share_obs[:, 0],
-                    next_obs.transpose(1, 0, 2),
-                    None
-                )
+            data = (
+                share_obs[:, 0],
+                obs.transpose(1, 0, 2),
+                actions.transpose(1, 0, 2),
+                available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None,
+                reward,
+                done,
+                terms,
+                next_share_obs[:, 0],
+                next_obs.transpose(1, 0, 2),
+                next_available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None
+            )
             self.buffer.insert(data)
             obs = new_obs
             share_obs = new_share_obs
@@ -286,32 +278,18 @@ class OffPolicyBaseRunner:
                     if "original_obs" in infos[i][0].keys():
                         next_obs[i] = infos[i][0]["original_obs"].copy()
                         next_share_obs[i] = infos[i][0]["original_state"].copy()
-            if self.envs.action_space[0].__class__.__name__ == "Discrete":
-                data = (
-                    share_obs[:, 0],
-                    obs.transpose(1, 0, 2),
-                    actions.transpose(1, 0, 2),
-                    available_actions.transpose(1, 0, 2),
-                    reward[:, 0],
-                    np.expand_dims(done, axis=-1)[:, 0],
-                    terms,
-                    next_share_obs[:, 0],
-                    next_obs.transpose(1, 0, 2),
-                    next_available_actions.transpose(1, 0, 2)
-                )
-            else:
-                data = (
-                    share_obs[:, 0],
-                    obs.transpose(1, 0, 2),
-                    actions.transpose(1, 0, 2),
-                    None,
-                    reward[:, 0],
-                    np.expand_dims(done, axis=-1)[:, 0],
-                    terms,
-                    next_share_obs[:, 0],
-                    next_obs.transpose(1, 0, 2),
-                    None
-                )
+            data = (
+                share_obs[:, 0],
+                obs.transpose(1, 0, 2),
+                actions.transpose(1, 0, 2),
+                available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None,
+                reward[:, 0],
+                np.expand_dims(done, axis=-1)[:, 0],
+                terms,
+                next_share_obs[:, 0],
+                next_obs.transpose(1, 0, 2),
+                next_available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None
+            )
             self.buffer.insert(data)
             obs = new_obs
             share_obs = new_share_obs
@@ -511,12 +489,22 @@ class OffPolicyBaseRunner:
             self.actor[agent_id].restore(self.algo_args['train']['model_dir'], agent_id)
         if not self.algo_args['render']['use_render']:
             self.critic.restore(self.algo_args['train']['model_dir'])
+            if self.value_normalizer is not None:
+                value_normalizer_state_dict = torch.load(
+                    str(self.algo_args['train']['model_dir']) + "/value_normalizer" + ".pt"
+                )
+                self.value_normalizer.load_state_dict(value_normalizer_state_dict)
 
     def save(self):
         """Save the model"""
         for agent_id in range(self.num_agents):
             self.actor[agent_id].save(self.save_dir, agent_id)
         self.critic.save(self.save_dir)
+        if self.value_normalizer is not None:
+            torch.save(
+                self.value_normalizer.state_dict(),
+                str(self.save_dir) + "/value_normalizer" + ".pt",
+            )
 
     def close(self):
         """Close environment, writter, and log file."""

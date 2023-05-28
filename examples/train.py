@@ -35,9 +35,9 @@ def main():
             "football",
             "dexhands",
             "smacv2",
-            "jsbsim",
+            "lag",
         ],
-        help="Environment name. Choose from: smac, mamujoco, pettingzoo_mpe, gym, football, dexhands, smacv2, jsbsim.",
+        help="Environment name. Choose from: smac, mamujoco, pettingzoo_mpe, gym, football, dexhands, smacv2, lag.",
     )
     parser.add_argument("--exp_name", type=str, default="installtest", help="Experiment name.")
     parser.add_argument(

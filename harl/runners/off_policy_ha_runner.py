@@ -47,7 +47,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 sp_next_share_obs,
                 next_actions,
                 next_logp_actions,
-                sp_gamma
+                sp_gamma,
+                self.value_normalizer
             )
         else:
             next_actions = []
@@ -62,6 +63,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 sp_next_share_obs,
                 next_actions,
                 sp_gamma,
+                self.value_normalizer
             )
         self.critic.turn_off_grad()
         if self.total_it % self.policy_freq == 0:

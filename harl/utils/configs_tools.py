@@ -63,7 +63,7 @@ def get_task_name(env, env_args):
         task = env_args["env_name"]
     elif env == "dexhands":
         task = env_args["task"]
-    elif env == "jsbsim":
+    elif env == "lag":
         task = f"{env_args['task']}-{env_args['scenario']}"
     return task
 

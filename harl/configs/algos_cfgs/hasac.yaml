@@ -3,7 +3,7 @@ seed:
   # whether to use the specified seed
   seed_specify: True
   # seed
-  seed: 1
+  seed: 3
 device:
   # whether to use CUDA
   cuda: True
@@ -13,7 +13,7 @@ device:
   torch_threads: 4
 train:
   # number of parallel environments for training data collection
-  n_rollout_threads: 10
+  n_rollout_threads: 20
   # number of total steps
   num_env_steps: 10000000
   # number of warmup steps
@@ -26,8 +26,10 @@ train:
   log_interval: ~
   # evaluation interval
   eval_interval: 10000
+  # whether to use PopArt
+  use_popart: True
   # whether to use linear learning rate decay
-  use_linear_lr_decay: False
+  use_linear_lr_decay: True
   # whether to consider the case of truncation when an episode is done
   use_proper_time_limits: True
   # if set, load models from this directory; otherwise, randomly initialise the models
@@ -65,7 +67,7 @@ model:
   critic_lr: 0.0003
 algo:
   # whether to auto-tune temperature
-  auto_alpha: False
+  auto_alpha: True
   # temperature parameter
   alpha: 0.0001
   # alpha learning rate
@@ -80,6 +82,10 @@ algo:
   polyak: 0.005
   # the number of steps to look ahead
   n_step: 20
+  # whether to use huber loss
+  use_huber_loss: True
+  # huber delta
+  huber_delta: 10.0
   # whether to share parameter among actors
   share_param: False
   # whether to use a fixed optimisation order

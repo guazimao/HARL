@@ -43,6 +43,8 @@ class SoftTwinQCritic:
         self.critic_lr = args["critic_lr"]
         self.polyak = args["polyak"]
         self.use_proper_time_limits = args["use_proper_time_limits"]
+        self.use_huber_loss = args["use_huber_loss"]
+        self.huber_delta = args["huber_delta"]
         critic_params = itertools.chain(self.critic.parameters(), self.critic2.parameters())
         self.critic_optimizer = torch.optim.Adam(
             critic_params,
@@ -96,7 +98,8 @@ class SoftTwinQCritic:
         next_share_obs,
         next_actions,
         next_logp_actions,
-        gamma
+        gamma,
+        value_normalizer=None
     ):
         """Train the critic.
         Args:
@@ -109,6 +112,7 @@ class SoftTwinQCritic:
             next_actions: (n_agents, batch_size, dim)
             next_logp_actions: (n_agents, batch_size, 1)
             gamma: (batch_size, 1)
+            value_normalizer: (PopArt) normalize the rewards, denormalize critic outputs.
         """
         assert share_obs.__class__.__name__ == "ndarray"
         assert actions.__class__.__name__ == "ndarray"
@@ -150,15 +154,35 @@ class SoftTwinQCritic:
         next_q_values2 = self.target_critic2(next_share_obs, next_actions)
         next_q_values = torch.min(next_q_values1, next_q_values2)
         if self.use_proper_time_limits:
-            q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - term)
+            if value_normalizer is not None:
+                q_targets = reward + gamma * (
+                        check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) - self.alpha * next_logp_actions
+                ) * (1 - term)
+                q_targets = check(value_normalizer(q_targets)).to(**self.tpdv)
+            else:
+                q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - term)
         else:
-            q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - done)
-        critic_loss1 = torch.mean(
-            F.mse_loss(self.critic(share_obs, actions), q_targets)
-        )
-        critic_loss2 = torch.mean(
-            F.mse_loss(self.critic2(share_obs, actions), q_targets)
-        )
+            if value_normalizer is not None:
+                q_targets = reward + gamma * (
+                        check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) - self.alpha * next_logp_actions
+                ) * (1 - done)
+                q_targets = value_normalizer(q_targets).to(**self.tpdv)
+            else:
+                q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - done)
+        if self.use_huber_loss:
+            critic_loss1 = torch.mean(
+                F.huber_loss(self.critic(share_obs, actions), q_targets, delta=self.huber_delta)
+            )
+            critic_loss2 = torch.mean(
+                F.huber_loss(self.critic2(share_obs, actions), q_targets, delta=self.huber_delta)
+            )
+        else:
+            critic_loss1 = torch.mean(
+                F.mse_loss(self.critic(share_obs, actions), q_targets)
+            )
+            critic_loss2 = torch.mean(
+                F.mse_loss(self.critic2(share_obs, actions), q_targets)
+            )
         critic_loss = critic_loss1 + critic_loss2
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
