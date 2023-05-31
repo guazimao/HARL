@@ -91,6 +91,7 @@ class OffPolicyBaseRunner:
                 else None
             )
         self.num_agents = get_num_agents(args["env"], env_args, self.envs)
+        self.agent_deaths = np.zeros((self.algo_args['train']['n_rollout_threads'], self.num_agents, 1))
 
         self.action_spaces = self.envs.action_space
         for agent_id in range(self.num_agents):
@@ -143,6 +144,7 @@ class OffPolicyBaseRunner:
                 self.envs.action_space,
             )
 
+        # TODO: check
         if self.algo_args['train']['use_popart'] is True:
             self.value_normalizer = PopArt(1, device=self.device)
         else:
@@ -189,39 +191,26 @@ class OffPolicyBaseRunner:
         )
         for step in range(1, steps + 1):
             actions = self.get_actions(obs, available_actions=available_actions, add_random=True)
-            new_obs, new_share_obs, reward, done, infos, new_available_actions = self.envs.step(
+            new_obs, new_share_obs, rewards, dones, infos, new_available_actions = self.envs.step(
                 actions
-            )  # reward: (n_threads, n_agents, 1); done: (n_threads, n_agents)
+            )  # rewards: (n_threads, n_agents, 1); dones: (n_threads, n_agents)
             # available_actions: (n_threads, ) of None or (n_threads, n_agents, action_number)
-            terms = np.full((self.algo_args['train']['n_rollout_threads'], 1), False)
             next_obs = new_obs.copy()
             next_share_obs = new_share_obs.copy()
             next_available_actions = new_available_actions.copy()
-            for i in range(self.algo_args['train']['n_rollout_threads']):
-                if done[i][0]:
-                    if not (
-                        "bad_transition" in infos[i][0].keys()
-                        and infos[i][0]["bad_transition"] == True
-                    ):  # not trunc
-                        terms[i][0] = True
-                    if "original_obs" in infos[i][0].keys():
-                        next_obs[i] = infos[i][0]["original_obs"].copy()
-                        next_share_obs[i] = infos[i][0]["original_state"].copy()
-            reward = reward[:, 0]
-            done = np.expand_dims(np.all(done, axis=1), axis=-1)
             data = (
-                share_obs[:, 0],
+                share_obs,
                 obs.transpose(1, 0, 2),
                 actions.transpose(1, 0, 2),
                 available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None,
-                reward,
-                done,
-                terms,
-                next_share_obs[:, 0],
-                next_obs.transpose(1, 0, 2),
+                rewards,
+                dones,
+                infos,
+                next_share_obs,
+                next_obs,
                 next_available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None
             )
-            self.buffer.insert(data)
+            self.insert(data)
             obs = new_obs
             share_obs = new_share_obs
             available_actions = new_available_actions
@@ -263,38 +252,80 @@ class OffPolicyBaseRunner:
         for _ in range(warmup_steps):
             # action: (n_threads, n_agents, dim)
             actions = self.sample_actions(available_actions)
-            new_obs, new_share_obs, reward, done, infos, new_available_actions = self.envs.step(actions)
-            terms = np.full((self.algo_args['train']['n_rollout_threads'], 1), False)
+            new_obs, new_share_obs, rewards, dones, infos, new_available_actions = self.envs.step(actions)
             next_obs = new_obs.copy()
             next_share_obs = new_share_obs.copy()
             next_available_actions = new_available_actions.copy()
-            for i in range(self.algo_args['train']['n_rollout_threads']):
-                if done[i][0]:
-                    if not (
-                        "bad_transition" in infos[i][0].keys()
-                        and infos[i][0]["bad_transition"] == True
-                    ):
-                        terms[i][0] = True
-                    if "original_obs" in infos[i][0].keys():
-                        next_obs[i] = infos[i][0]["original_obs"].copy()
-                        next_share_obs[i] = infos[i][0]["original_state"].copy()
             data = (
-                share_obs[:, 0],
+                share_obs,
                 obs.transpose(1, 0, 2),
                 actions.transpose(1, 0, 2),
                 available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None,
-                reward[:, 0],
-                np.expand_dims(done, axis=-1)[:, 0],
-                terms,
-                next_share_obs[:, 0],
-                next_obs.transpose(1, 0, 2),
+                rewards,
+                dones,
+                infos,
+                next_share_obs,
+                next_obs,
                 next_available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None
             )
-            self.buffer.insert(data)
+            self.insert(data)
             obs = new_obs
             share_obs = new_share_obs
             available_actions = new_available_actions
         return obs, share_obs, available_actions
+
+    def insert(self, data):
+        (
+            share_obs,  # (n_threads, n_agents, share_obs_dim)
+            obs,  # (n_agents, n_threads, obs_dim)
+            actions,  # (n_agents, n_threads, action_dim)
+            available_actions,  # None or (n_agents, n_threads, action_number)
+            rewards,  # (n_threads, n_agents, 1)
+            dones,  # (n_threads, n_agents)
+            infos,  # type: list, shape: (n_threads, n_agents)
+            next_share_obs,  # (n_threads, n_agents, next_share_obs_dim)
+            next_obs,  # (n_threads, n_agents, next_obs_dim)
+            next_available_actions,  # None or (n_agents, n_threads, next_action_number)
+        ) = data
+
+        dones_env = np.all(dones, axis=1)  # if all agents are done, then env is done
+
+        # valid_transition denotes whether each transition is valid or not (invalid if corresponding agent is dead)
+        # shape: (n_threads, n_agents, 1)
+        valid_transitions = 1 - self.agent_deaths
+
+        self.agent_deaths = np.expand_dims(dones, axis=-1)
+
+        # terms use False to denote truncation and True to denote termination (EP)
+        # TODO: terms for FP
+        terms = np.full((self.algo_args['train']['n_rollout_threads'], 1), False)
+        for i in range(self.algo_args['train']['n_rollout_threads']):
+            if np.all(dones[i]):
+                if not (
+                        "bad_transition" in infos[i][0].keys()
+                        and infos[i][0]["bad_transition"] == True
+                ):
+                    terms[i][0] = True
+                self.agent_deaths = np.zeros((self.algo_args['train']['n_rollout_threads'], self.num_agents, 1))
+                next_obs[i] = infos[i][0]["original_obs"].copy()
+                next_share_obs[i] = infos[i][0]["original_state"].copy()
+
+        # data for EP TODO: data for FP
+        data = (
+            share_obs[:, 0],  # (n_threads, share_obs_dim)
+            obs.transpose,  # (n_agents, n_threads, obs_dim)
+            actions,  # (n_agents, n_threads, action_dim)
+            available_actions,  # None or (n_agents, n_threads, action_number)
+            rewards[:, 0],  # (n_threads, n_agents, 1)
+            np.expand_dims(dones_env, axis=-1),  # (n_threads, 1)
+            valid_transitions.transpose(1, 0, 2),  # (n_agents, n_threads, 1)
+            terms,  # (n_threads, 1)
+            next_share_obs[:, 0],  # (n_threads, next_share_obs_dim)
+            next_obs.transpose(1, 0, 2),  # (n_agents, n_threads, next_obs_dim)
+            next_available_actions,  # None or (n_agents, n_threads, next_action_number)
+        )
+
+        self.buffer.insert(data)
     
     def sample_actions(self, available_actions=None):
         """Sample random actions for warmup.

@@ -3,7 +3,7 @@ seed:
   # whether to use the specified seed
   seed_specify: True
   # seed
-  seed: 3
+  seed: 1
 device:
   # whether to use CUDA
   cuda: True
@@ -27,7 +27,7 @@ train:
   # evaluation interval
   eval_interval: 10000
   # whether to use PopArt
-  use_popart: True
+  use_popart: False
   # whether to use linear learning rate decay
   use_linear_lr_decay: True
   # whether to consider the case of truncation when an episode is done
@@ -83,7 +83,9 @@ algo:
   # the number of steps to look ahead
   n_step: 20
   # whether to use huber loss
-  use_huber_loss: True
+  use_huber_loss: False
+  # whether to use policy active masks
+  use_policy_active_masks: True
   # huber delta
   huber_delta: 10.0
   # whether to share parameter among actors

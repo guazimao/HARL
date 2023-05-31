@@ -183,7 +183,6 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
                     info[0]["original_state"] = copy.deepcopy(s_ob)
                     info[0]["original_avail_actions"] = copy.deepcopy(available_actions)
                     ob, s_ob, available_actions = env.reset()
-
             remote.send((ob, s_ob, reward, done, info, available_actions))
         elif cmd == "reset":
             ob, s_ob, available_actions = env.reset()
@@ -318,7 +317,6 @@ class ShareDummyVecEnv(ShareVecEnv):
         obs, share_obs, rews, dones, infos, available_actions = map(
             np.array, zip(*results)
         )
-
         for i, done in enumerate(dones):
             if "bool" in done.__class__.__name__:  # done is a bool
                 if done:  # if done, save the original obs, state, and available actions in info, and then reset

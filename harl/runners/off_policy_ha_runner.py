@@ -19,6 +19,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
             sp_available_actions,  # (n_agents, batch_size, dim)
             sp_reward,  # (batch_size, 1)
             sp_done,  # (batch_size, 1)
+            sp_valid_transition,  # (n_agents, batch_size, 1)
             sp_term,  # (batch_size, 1)
             sp_next_share_obs,  # (batch_size, dim)
             sp_next_obs,  # (n_agents, batch_size, dim)
@@ -90,7 +91,12 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                     actions_t = torch.cat(actions, dim=-1)
                     value_pred = self.critic.get_values(
                         sp_share_obs, actions_t)
-                    actor_loss = -torch.mean(value_pred - self.alpha[agent_id] * logp_action)
+                    if self.algo_args['algo']['use_policy_active_masks']:
+                        actor_loss = -torch.sum(
+                            (value_pred - self.alpha[agent_id] * logp_action) * sp_valid_transition[agent_id]
+                        ) / sp_valid_transition[agent_id].sum()
+                    else:
+                        actor_loss = -torch.mean(value_pred - self.alpha[agent_id] * logp_action)
                     self.actor[agent_id].actor_optimizer.zero_grad()
                     actor_loss.backward()
                     self.actor[agent_id].actor_optimizer.step()

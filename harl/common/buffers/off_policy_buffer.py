@@ -57,6 +57,13 @@ class OffPolicyBuffer:
         # Buffer for rewards received by agents at each timestep
         self.rewards = np.zeros((self.buffer_size, 1), dtype=np.float32)
 
+        # Buffer for valid_transitions of each agent
+        self.valid_transitions = []
+        for agent_id in range(num_agents):
+            self.valid_transitions.append(
+                np.ones((self.buffer_size, 1), dtype=np.float32)
+            )
+
         # Buffer for actions and available actions taken by agents at each timestep
         self.actions = []
         self.available_actions = []
@@ -85,12 +92,13 @@ class OffPolicyBuffer:
             available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
             reward: (n_rollout_threads, 1)
             done: (n_rollout_threads, 1)
+            valid_transitions: [(n_rollout_threads, 1) for agent_id in range(num_agents)]
             term: (n_rollout_threads, 1)
             next_share_obs: (n_rollout_threads, *share_obs_shape)
             next_obs: [(n_rollout_threads, *obs_shapes[agent_id]) for agent_id in range(num_agents)]
             next_available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
         """
-        share_obs, obs, actions, available_actions, reward, done, term, next_share_obs, next_obs, next_available_actions = data
+        share_obs, obs, actions, available_actions, reward, done, valid_transitions, term, next_share_obs, next_obs, next_available_actions = data
         length = share_obs.shape[0]
         if self.idx + length <= self.buffer_size:  # no overflow
             s = self.idx
@@ -103,6 +111,7 @@ class OffPolicyBuffer:
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id].copy()
                 self.actions[agent_id][s:e] = actions[agent_id].copy()
+                self.valid_transitions[agent_id][s:e] = valid_transitions[agent_id].copy()
                 if self.act_spaces[agent_id].__class__.__name__ == 'Discrete':
                     self.available_actions[agent_id][s:e] = available_actions[agent_id].copy()
                     self.next_available_actions[agent_id][s:e] = next_available_actions[agent_id].copy()
@@ -122,6 +131,7 @@ class OffPolicyBuffer:
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id][0:len1].copy()
                 self.actions[agent_id][s:e] = actions[agent_id][0:len1].copy()
+                self.valid_transitions[agent_id][s:e] = valid_transitions[agent_id][0:len1].copy()
                 if self.act_spaces[agent_id].__class__.__name__ == 'Discrete':
                     self.available_actions[agent_id][s:e] = available_actions[agent_id][0:len1].copy()
                     self.next_available_actions[agent_id][s:e] = next_available_actions[agent_id][0:len1].copy()
@@ -138,6 +148,7 @@ class OffPolicyBuffer:
             for agent_id in range(self.num_agents):
                 self.obs[agent_id][s:e] = obs[agent_id][len1:length].copy()
                 self.actions[agent_id][s:e] = actions[agent_id][len1:length].copy()
+                self.valid_transitions[agent_id][s:e] = valid_transitions[agent_id][len1:length].copy()
                 if self.act_spaces[agent_id].__class__.__name__ == 'Discrete':
                     self.available_actions[agent_id][s:e] = available_actions[agent_id][len1:length].copy()
                     self.next_available_actions[agent_id][s:e] = next_available_actions[agent_id][len1:length].copy()
@@ -155,6 +166,7 @@ class OffPolicyBuffer:
             sp_available_actions: (n_agents, batch_size, *dim)
             sp_reward: (batch_size, 1)
             sp_done: (batch_size, 1)
+            sp_valid_transitions: (n_agents, batch_size, 1)
             sp_term: (batch_size, 1)
             sp_next_share_obs: (batch_size, *dim)
             sp_next_obs: (n_agents, batch_size, *dim)
@@ -168,6 +180,9 @@ class OffPolicyBuffer:
         sp_obs = np.array([self.obs[agent_id][indice] for agent_id in range(self.num_agents)])
         sp_actions = np.array(
             [self.actions[agent_id][indice] for agent_id in range(self.num_agents)]
+        )
+        sp_valid_transitions = np.array(
+            [self.valid_transitions[agent_id][indice] for agent_id in range(self.num_agents)]
         )
         if self.act_spaces[0].__class__.__name__ == 'Discrete':
             sp_available_actions = np.array([self.available_actions[agent_id][indice]
@@ -210,6 +225,7 @@ class OffPolicyBuffer:
                 sp_available_actions,
                 sp_reward,
                 sp_done,
+                sp_valid_transitions,
                 sp_term,
                 sp_next_share_obs,
                 sp_next_obs,
@@ -224,6 +240,7 @@ class OffPolicyBuffer:
                 None,
                 sp_reward,
                 sp_done,
+                sp_valid_transitions,
                 sp_term,
                 sp_next_share_obs,
                 sp_next_obs,
