@@ -56,7 +56,7 @@ class HASAC(OffPolicyBase):
         if self.action_type == "Box":
             actions, logp_actions = self.actor(obs, stochastic=stochastic, with_logprob=True)
         elif self.action_type == "Discrete":
-            logits = torch.log(self.actor.get_probs(obs, available_actions) + 1e-8)
+            logits = torch.log(self.actor.get_probs(obs, available_actions) + 1e-5)
             actions = gumbel_softmax(logits, hard=True, device=self.device)
             logp_actions = torch.sum(actions * logits, dim=-1, keepdim=True)
         elif self.action_type == "MultiDiscrete":
@@ -64,7 +64,7 @@ class HASAC(OffPolicyBase):
             actions = []
             logp_actions = []
             for prob in probs:
-                logits = torch.log(prob + 1e-8)
+                logits = torch.log(prob + 1e-5)
                 action = gumbel_softmax(logits, hard=True, device=self.device)
                 logp_action = torch.sum(action * logits, dim=-1, keepdim=True)
                 actions.append(action)

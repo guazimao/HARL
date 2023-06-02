@@ -1,2 +1,2 @@
-map_name: 5m_vs_6m
+map_name: corridor
 state_type: EP # choose from FP (Feature Pruned) and EP (Environment Provided)

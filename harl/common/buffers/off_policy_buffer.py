@@ -7,7 +7,7 @@ from harl.utils.envs_tools import get_shape_from_obs_space, get_shape_from_act_s
 class OffPolicyBuffer:
     """Off-policy buffer."""
 
-    def __init__(self, args, share_obs_space, num_agents, obs_spaces, act_spaces):
+    def __init__(self, args, share_obs_space, num_agents, obs_spaces, act_spaces, state_type):
         """Initialize off-policy buffer.
         Args:
             args: (dict) arguments
@@ -25,6 +25,7 @@ class OffPolicyBuffer:
         self.idx = 0  # current index to insert
         self.num_agents = num_agents
         self.act_spaces = act_spaces
+        self.state_type = state_type
 
         # get shapes of share obs, obs, and actions
         share_obs_shape = get_shape_from_obs_space(share_obs_space)
@@ -40,10 +41,16 @@ class OffPolicyBuffer:
             act_shapes.append(get_shape_from_act_space(act_spaces[agent_id]))
 
         # Buffer for share observations
-        self.share_obs = np.zeros((self.buffer_size, *share_obs_shape), dtype=np.float32)
+        if state_type == "EP":
+            self.share_obs = np.zeros((self.buffer_size, *share_obs_shape), dtype=np.float32)
+        elif state_type == "FP":
+            self.share_obs = np.zeros((self.buffer_size, self.num_agents, *share_obs_shape), dtype=np.float32)
 
         # Buffer for next share observations
-        self.next_share_obs = np.zeros((self.buffer_size, *share_obs_shape), dtype=np.float32)
+        if state_type == "EP":
+            self.next_share_obs = np.zeros((self.buffer_size, *share_obs_shape), dtype=np.float32)
+        elif state_type == "FP":
+            self.next_share_obs = np.zeros((self.buffer_size, self.num_agents, *share_obs_shape), dtype=np.float32)
 
         # Buffer for observations and next observations of each agent
         self.obs = []
@@ -80,21 +87,24 @@ class OffPolicyBuffer:
 
         # Buffer for done and termination flags
         self.dones = np.full((self.buffer_size, 1), False)
-        self.terms = np.full((self.buffer_size, 1), False)
+        if self.state_type == "EP":
+            self.terms = np.full((self.buffer_size, 1), False)
+        elif self.state_type == "FP":
+            self.terms = np.full((self.buffer_size, self.num_agents, 1), False)
 
     def insert(self, data):
         """Insert data into buffer.
         Args:
-            data: a tuple of (share_obs, obs, action, reward, done, term, next_share_obs, next_obs)
-            share_obs: (n_rollout_threads, *share_obs_shape)
+            data: a tuple of (share_obs, obs, actions, available_actions, reward, done, valid_transitions, term, next_share_obs, next_obs, next_available_actions)
+            share_obs: EP: (n_rollout_threads, *share_obs_shape), FP: (n_rollout_threads, num_agents, *share_obs_shape)
             obs: [(n_rollout_threads, *obs_shapes[agent_id]) for agent_id in range(num_agents)]
             actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
             available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
             reward: (n_rollout_threads, 1)
             done: (n_rollout_threads, 1)
             valid_transitions: [(n_rollout_threads, 1) for agent_id in range(num_agents)]
-            term: (n_rollout_threads, 1)
-            next_share_obs: (n_rollout_threads, *share_obs_shape)
+            term: EP: (n_rollout_threads, 1), FP: (n_rollout_threads, num_agents, 1)
+            next_share_obs: EP: (n_rollout_threads, *share_obs_shape), FP: (n_rollout_threads, num_agents, *share_obs_shape)
             next_obs: [(n_rollout_threads, *obs_shapes[agent_id]) for agent_id in range(num_agents)]
             next_available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
         """
@@ -160,23 +170,29 @@ class OffPolicyBuffer:
     def sample(self):
         """Sample data for training.
         Returns:
-            sp_share_obs: (batch_size, *dim)
+            sp_share_obs: EP: (batch_size, *dim), FP: (n_agents * batch_size, *dim)
             sp_obs: (n_agents, batch_size, *dim)
             sp_actions: (n_agents, batch_size, *dim)
             sp_available_actions: (n_agents, batch_size, *dim)
-            sp_reward: (batch_size, 1)
-            sp_done: (batch_size, 1)
+            sp_reward: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_done: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
             sp_valid_transitions: (n_agents, batch_size, 1)
-            sp_term: (batch_size, 1)
-            sp_next_share_obs: (batch_size, *dim)
+            sp_term: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_next_share_obs: EP: (batch_size, *dim), FP: (n_agents * batch_size, *dim)
             sp_next_obs: (n_agents, batch_size, *dim)
             sp_next_available_actions: (n_agents, batch_size, *dim)
+            sp_gamma: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
         """
         self.update_end_flag()  # update the current end flag
         indice = torch.randperm(self.cur_size).numpy()[: self.batch_size]  # sample indice
 
         # get data at the beginning indice
-        sp_share_obs = self.share_obs[indice]  
+        if self.state_type == "EP":
+            sp_share_obs = self.share_obs[indice]
+        elif self.state_type == "FP":
+            sp_share_obs = np.concatenate(
+                self.share_obs[indice].transpose(1, 0, 2), axis=0
+            )  # (batch_size, n_agents, *dim) -> (n_agents, batch_size, *dim) -> (n_agents * batch_size, *dim)
         sp_obs = np.array([self.obs[agent_id][indice] for agent_id in range(self.num_agents)])
         sp_actions = np.array(
             [self.actions[agent_id][indice] for agent_id in range(self.num_agents)]
@@ -194,9 +210,20 @@ class OffPolicyBuffer:
             indices.append(self.next(indices[-1]))
 
         # get data at the last indice
-        sp_done = self.dones[indices[-1]]
-        sp_term = self.terms[indices[-1]]
-        sp_next_share_obs = self.next_share_obs[indices[-1]]
+        if self.state_type == "EP":
+            sp_done = self.dones[indices[-1]]
+            sp_term = self.terms[indices[-1]]
+            sp_next_share_obs = self.next_share_obs[indices[-1]]
+        elif self.state_type == "FP":
+            sp_done = np.tile(
+                self.dones[indices[-1]], (self.num_agents, 1)
+            )  # (batch_size, 1) -> (n_agents * batch_size, 1)
+            sp_term = np.concatenate(
+                self.terms[indices[-1]].transpose(1, 0, 2), axis=0
+            )  # (batch_size, n_agents, 1) -> (n_agents, batch_size, 1) -> (n_agents * batch_size, 1)
+            sp_next_share_obs = np.concatenate(
+                self.next_share_obs[indices[-1]].transpose(1, 0, 2), axis=0
+            )  # (batch_size, n_agents, *dim) -> (n_agents, batch_size, *dim) -> (n_agents * batch_size, *dim)
         sp_next_obs = np.array(
             [self.next_obs[agent_id][indices[-1]] for agent_id in range(self.num_agents)]
         )
@@ -216,6 +243,9 @@ class OffPolicyBuffer:
             sp_reward[self.end_flag[now] > 0] = 0.0
             sp_reward = self.rewards[now] + self.gamma * sp_reward
         sp_gamma = gamma_buffer[gammas].reshape(self.batch_size, 1)
+        if self.state_type == "FP":
+            sp_reward = np.tile(sp_reward, (self.num_agents, 1))  # (batch_size, 1) -> (n_agents * batch_size, 1)
+            sp_gamma = np.tile(sp_gamma, (self.num_agents, 1))  # (batch_size, 1) -> (n_agents * batch_size, 1)
 
         if self.act_spaces[0].__class__.__name__ == 'Discrete':
             return (

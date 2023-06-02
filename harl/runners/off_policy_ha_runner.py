@@ -13,18 +13,18 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
         self.total_it += 1
         data = self.buffer.sample()
         (
-            sp_share_obs,  # (batch_size, dim)
+            sp_share_obs,  # EP: (batch_size, dim), FP: (n_agents * batch_size, dim)
             sp_obs,  # (n_agents, batch_size, dim)
             sp_actions,  # (n_agents, batch_size, dim)
             sp_available_actions,  # (n_agents, batch_size, dim)
-            sp_reward,  # (batch_size, 1)
-            sp_done,  # (batch_size, 1)
+            sp_reward,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_done,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
             sp_valid_transition,  # (n_agents, batch_size, 1)
-            sp_term,  # (batch_size, 1)
-            sp_next_share_obs,  # (batch_size, dim)
+            sp_term,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_next_share_obs,  # EP: (batch_size, dim), FP: (n_agents * batch_size, dim)
             sp_next_obs,  # (n_agents, batch_size, dim)
             sp_next_available_actions,  # (n_agents, batch_size, dim)
-            sp_gamma,  # (batch_size, 1)
+            sp_gamma,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
         ) = data
         # train critic
         self.critic.turn_on_grad()
@@ -44,6 +44,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 sp_actions,
                 sp_reward,
                 sp_done,
+                sp_valid_transition,
                 sp_term,
                 sp_next_share_obs,
                 next_actions,
@@ -67,6 +68,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 self.value_normalizer
             )
         self.critic.turn_off_grad()
+        sp_valid_transition = torch.tensor(sp_valid_transition, device=self.device)
         if self.total_it % self.policy_freq == 0:
             # train actors
             if self.args["algo"] == "hasac":
@@ -88,13 +90,23 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                     )
                     logp_action = torch.unsqueeze(logp_action, dim=1) if len(logp_action.shape) == 1 else logp_action
                     logp_actions[agent_id] = logp_action
-                    actions_t = torch.cat(actions, dim=-1)
+                    if self.state_type == "EP":
+                        actions_t = torch.cat(actions, dim=-1)
+                    elif self.state_type == "FP":
+                        logp_action = torch.tile(logp_action, (self.num_agents, 1))
+                        actions_t = torch.tile(torch.cat(actions, dim=-1), (self.num_agents, 1))
                     value_pred = self.critic.get_values(
                         sp_share_obs, actions_t)
                     if self.algo_args['algo']['use_policy_active_masks']:
-                        actor_loss = -torch.sum(
-                            (value_pred - self.alpha[agent_id] * logp_action) * sp_valid_transition[agent_id]
-                        ) / sp_valid_transition[agent_id].sum()
+                        if self.state_type == "EP":
+                            actor_loss = -torch.sum(
+                                (value_pred - self.alpha[agent_id] * logp_action) * sp_valid_transition[agent_id]
+                            ) / sp_valid_transition[agent_id].sum()
+                        elif self.state_type == "FP":
+                            valid_transition = torch.tile(sp_valid_transition[agent_id], (self.num_agents, 1))
+                            actor_loss = -torch.sum(
+                                (value_pred - self.alpha[agent_id] * logp_action) * valid_transition
+                            ) / valid_transition.sum()
                     else:
                         actor_loss = -torch.mean(value_pred - self.alpha[agent_id] * logp_action)
                     self.actor[agent_id].actor_optimizer.zero_grad()
@@ -103,7 +115,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                     self.actor[agent_id].turn_off_grad()
                     # train this agent's alpha
                     if self.algo_args['algo']['auto_alpha']:
-                        log_prob = logp_action.detach() + self.target_entropy[agent_id]
+                        log_prob = logp_actions[agent_id].detach() + self.target_entropy[agent_id]
                         alpha_loss = -(self.log_alpha[agent_id] * log_prob).mean()
                         self.alpha_optimizer[agent_id].zero_grad()
                         alpha_loss.backward()

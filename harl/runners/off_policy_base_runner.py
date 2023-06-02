@@ -24,6 +24,7 @@ from harl.algorithms.actors import ALGO_REGISTRY
 from harl.algorithms.critics import CRITIC_REGISTRY
 from harl.common.buffers.off_policy_buffer import OffPolicyBuffer
 
+
 class OffPolicyBaseRunner:
     """Base runner for off-policy algorithms."""
 
@@ -43,6 +44,7 @@ class OffPolicyBaseRunner:
         else:
             self.policy_freq = 1
 
+        self.state_type = env_args.get("state_type", "EP")
         self.share_param = algo_args["algo"]['share_param']
         self.fixed_order = algo_args["algo"]['fixed_order']
 
@@ -134,6 +136,8 @@ class OffPolicyBaseRunner:
                 {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
                 self.envs.share_observation_space[0],
                 self.envs.action_space,
+                self.num_agents,
+                self.state_type,
                 device=self.device,
             )
             self.buffer = OffPolicyBuffer(
@@ -142,6 +146,7 @@ class OffPolicyBaseRunner:
                 self.num_agents,
                 self.envs.observation_space,
                 self.envs.action_space,
+                self.state_type,
             )
 
         # TODO: check
@@ -296,34 +301,61 @@ class OffPolicyBaseRunner:
 
         self.agent_deaths = np.expand_dims(dones, axis=-1)
 
-        # terms use False to denote truncation and True to denote termination (EP)
-        # TODO: terms for FP
-        terms = np.full((self.algo_args['train']['n_rollout_threads'], 1), False)
+        # terms use False to denote truncation and True to denote termination
+        if self.state_type == "EP":
+            terms = np.full((self.algo_args['train']['n_rollout_threads'], 1), False)
+            for i in range(self.algo_args['train']['n_rollout_threads']):
+                if dones_env[i]:
+                    if not (
+                            "bad_transition" in infos[i][0].keys()
+                            and infos[i][0]["bad_transition"] == True
+                    ):
+                        terms[i][0] = True
+        elif self.state_type == "FP":
+            terms = np.full((self.algo_args['train']['n_rollout_threads'], self.num_agents, 1), False)
+            for i in range(self.algo_args['train']['n_rollout_threads']):
+                for agent_id in range(self.num_agents):
+                    if dones[i][agent_id]:
+                        if not (
+                                "bad_transition" in infos[i][agent_id].keys()
+                                and infos[i][agent_id]["bad_transition"] == True
+                        ):
+                            terms[i][agent_id][0] = True
+
         for i in range(self.algo_args['train']['n_rollout_threads']):
-            if np.all(dones[i]):
-                if not (
-                        "bad_transition" in infos[i][0].keys()
-                        and infos[i][0]["bad_transition"] == True
-                ):
-                    terms[i][0] = True
+            if dones_env[i]:
                 self.agent_deaths = np.zeros((self.algo_args['train']['n_rollout_threads'], self.num_agents, 1))
                 next_obs[i] = infos[i][0]["original_obs"].copy()
                 next_share_obs[i] = infos[i][0]["original_state"].copy()
 
-        # data for EP TODO: data for FP
-        data = (
-            share_obs[:, 0],  # (n_threads, share_obs_dim)
-            obs.transpose,  # (n_agents, n_threads, obs_dim)
-            actions,  # (n_agents, n_threads, action_dim)
-            available_actions,  # None or (n_agents, n_threads, action_number)
-            rewards[:, 0],  # (n_threads, n_agents, 1)
-            np.expand_dims(dones_env, axis=-1),  # (n_threads, 1)
-            valid_transitions.transpose(1, 0, 2),  # (n_agents, n_threads, 1)
-            terms,  # (n_threads, 1)
-            next_share_obs[:, 0],  # (n_threads, next_share_obs_dim)
-            next_obs.transpose(1, 0, 2),  # (n_agents, n_threads, next_obs_dim)
-            next_available_actions,  # None or (n_agents, n_threads, next_action_number)
-        )
+        if self.state_type == "EP":
+            data = (
+                share_obs[:, 0],  # (n_threads, share_obs_dim)
+                obs,  # (n_agents, n_threads, obs_dim)
+                actions,  # (n_agents, n_threads, action_dim)
+                available_actions,  # None or (n_agents, n_threads, action_number)
+                rewards[:, 0],  # (n_threads, 1)
+                np.expand_dims(dones_env, axis=-1),  # (n_threads, 1)
+                valid_transitions.transpose(1, 0, 2),  # (n_agents, n_threads, 1)
+                terms,  # (n_threads, 1)
+                next_share_obs[:, 0],  # (n_threads, next_share_obs_dim)
+                next_obs.transpose(1, 0, 2),  # (n_agents, n_threads, next_obs_dim)
+                next_available_actions,  # None or (n_agents, n_threads, next_action_number)
+            )
+        elif self.state_type == "FP":
+            data = (
+                share_obs,  # (n_threads, n_agents, share_obs_dim)
+                obs,  # (n_agents, n_threads, obs_dim)
+                actions,  # (n_agents, n_threads, action_dim)
+                available_actions,  # None or (n_agents, n_threads, action_number)
+                rewards[:, 0],  # (n_threads, 1)
+                np.expand_dims(dones_env, axis=-1),  # (n_threads, 1)
+                valid_transitions.transpose(1, 0, 2),  # (n_agents, n_threads, 1)
+                terms,  # (n_threads, n_agents, 1)
+                next_share_obs,  # (n_threads, n_agents, next_share_obs_dim)
+                next_obs.transpose(1, 0, 2),  # (n_agents, n_threads, next_obs_dim)
+                next_available_actions,  # None or (n_agents, n_threads, next_action_number)
+            )
 
         self.buffer.insert(data)
     
