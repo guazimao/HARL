@@ -5,7 +5,9 @@ from harl.utils.envs_tools import get_shape_from_obs_space, get_shape_from_act_s
 
 
 class OffPolicyBuffer:
-    """Off-policy buffer."""
+    """Off-policy buffer that could use both Environment-Provided (EP) and Feature-Pruned (FP) state.
+    When FP state is used, the critic takes different global state as input for different actors. Thus, OffPolicyBuffer has an extra dimension for number of agents`.
+    """
 
     def __init__(self, args, share_obs_space, num_agents, obs_spaces, act_spaces, state_type):
         """Initialize off-policy buffer.
@@ -62,7 +64,10 @@ class OffPolicyBuffer:
             )
 
         # Buffer for rewards received by agents at each timestep
-        self.rewards = np.zeros((self.buffer_size, 1), dtype=np.float32)
+        if self.state_type == "EP":
+            self.rewards = np.zeros((self.buffer_size, 1), dtype=np.float32)
+        elif self.state_type == "FP":
+            self.rewards = np.zeros((self.buffer_size, self.num_agents, 1), dtype=np.float32)
 
         # Buffer for valid_transitions of each agent
         self.valid_transitions = []
@@ -86,10 +91,11 @@ class OffPolicyBuffer:
                     (self.buffer_size, act_spaces[agent_id].n), dtype=np.float32))
 
         # Buffer for done and termination flags
-        self.dones = np.full((self.buffer_size, 1), False)
         if self.state_type == "EP":
+            self.dones = np.full((self.buffer_size, 1), False)
             self.terms = np.full((self.buffer_size, 1), False)
         elif self.state_type == "FP":
+            self.dones = np.full((self.buffer_size, self.num_agents, 1), False)
             self.terms = np.full((self.buffer_size, self.num_agents, 1), False)
 
     def insert(self, data):
@@ -100,8 +106,8 @@ class OffPolicyBuffer:
             obs: [(n_rollout_threads, *obs_shapes[agent_id]) for agent_id in range(num_agents)]
             actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
             available_actions: [(n_rollout_threads, *act_shapes[agent_id]) for agent_id in range(num_agents)]
-            reward: (n_rollout_threads, 1)
-            done: (n_rollout_threads, 1)
+            reward: EP: (n_rollout_threads, 1), FP: (n_rollout_threads, num_agents, 1)
+            done: EP: (n_rollout_threads, 1), FP: (n_rollout_threads, num_agents, 1)
             valid_transitions: [(n_rollout_threads, 1) for agent_id in range(num_agents)]
             term: EP: (n_rollout_threads, 1), FP: (n_rollout_threads, num_agents, 1)
             next_share_obs: EP: (n_rollout_threads, *share_obs_shape), FP: (n_rollout_threads, num_agents, *share_obs_shape)
@@ -184,7 +190,7 @@ class OffPolicyBuffer:
             sp_gamma: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
         """
         self.update_end_flag()  # update the current end flag
-        indice = torch.randperm(self.cur_size).numpy()[: self.batch_size]  # sample indice
+        indice = torch.randperm(self.cur_size).numpy()[: self.batch_size]  # sample indice, shape: (batch_size, )
 
         # get data at the beginning indice
         if self.state_type == "EP":
@@ -201,10 +207,13 @@ class OffPolicyBuffer:
             [self.valid_transitions[agent_id][indice] for agent_id in range(self.num_agents)]
         )
         if self.act_spaces[0].__class__.__name__ == 'Discrete':
-            sp_available_actions = np.array([self.available_actions[agent_id][indice]
-                                             for agent_id in range(self.num_agents)])
+            sp_available_actions = np.array(
+                [self.available_actions[agent_id][indice] for agent_id in range(self.num_agents)]
+            )
 
         # compute the indices along n steps
+        if self.state_type == "FP":
+            indice = np.repeat(np.expand_dims(indice, axis=-1), self.num_agents, axis=-1)  # (batch_size, n_agents)
         indices = [indice]
         for _ in range(self.n_step - 1):
             indices.append(self.next(indices[-1]))
@@ -214,38 +223,67 @@ class OffPolicyBuffer:
             sp_done = self.dones[indices[-1]]
             sp_term = self.terms[indices[-1]]
             sp_next_share_obs = self.next_share_obs[indices[-1]]
+            sp_next_obs = np.array(
+                [self.next_obs[agent_id][indices[-1]] for agent_id in range(self.num_agents)]
+            )
+            if self.act_spaces[0].__class__.__name__ == 'Discrete':
+                sp_next_available_actions = np.array(
+                    [self.next_available_actions[agent_id][indices[-1]] for agent_id in range(self.num_agents)]
+                )
         elif self.state_type == "FP":
-            sp_done = np.tile(
-                self.dones[indices[-1]], (self.num_agents, 1)
-            )  # (batch_size, 1) -> (n_agents * batch_size, 1)
+            sp_done = np.concatenate(
+                [self.dones[indices[-1][:, agent_id], agent_id] for agent_id in range(self.num_agents)]
+            )  # (n_agents, batch_size, 1) -> (n_agents * batch_size, 1)
             sp_term = np.concatenate(
-                self.terms[indices[-1]].transpose(1, 0, 2), axis=0
-            )  # (batch_size, n_agents, 1) -> (n_agents, batch_size, 1) -> (n_agents * batch_size, 1)
+                [self.terms[indices[-1][:, agent_id], agent_id] for agent_id in range(self.num_agents)]
+            )  # (n_agents, batch_size, 1) -> (n_agents * batch_size, 1)
             sp_next_share_obs = np.concatenate(
-                self.next_share_obs[indices[-1]].transpose(1, 0, 2), axis=0
-            )  # (batch_size, n_agents, *dim) -> (n_agents, batch_size, *dim) -> (n_agents * batch_size, *dim)
-        sp_next_obs = np.array(
-            [self.next_obs[agent_id][indices[-1]] for agent_id in range(self.num_agents)]
-        )
-        if self.act_spaces[0].__class__.__name__ == 'Discrete':
-            sp_next_available_actions = np.array(
-                [self.next_available_actions[agent_id][indices[-1]] for agent_id in range(self.num_agents)])
+                [self.next_share_obs[indices[-1][:, agent_id], agent_id] for agent_id in range(self.num_agents)]
+            )  # (n_agents, batch_size, *dim) -> (n_agents * batch_size, *dim)
+            sp_next_obs = np.array(
+                [self.next_obs[agent_id][indices[-1][:, agent_id]] for agent_id in range(self.num_agents)]
+            )
+            if self.act_spaces[0].__class__.__name__ == 'Discrete':
+                sp_next_available_actions = np.array(
+                    [self.next_available_actions[agent_id][indices[-1][:, agent_id]] for agent_id in range(self.num_agents)]
+                )
 
         # compute accumulated rewards and the corresponding gamma
-        gamma_buffer = np.ones(self.n_step + 1)
-        for i in range(1, self.n_step + 1):
-            gamma_buffer[i] = gamma_buffer[i - 1] * self.gamma
-        sp_reward = np.zeros((self.batch_size, 1))
-        gammas = np.full(self.batch_size, self.n_step)
-        for n in range(self.n_step - 1, -1, -1):
-            now = indices[n]
-            gammas[self.end_flag[now] > 0] = n + 1
-            sp_reward[self.end_flag[now] > 0] = 0.0
-            sp_reward = self.rewards[now] + self.gamma * sp_reward
-        sp_gamma = gamma_buffer[gammas].reshape(self.batch_size, 1)
-        if self.state_type == "FP":
-            sp_reward = np.tile(sp_reward, (self.num_agents, 1))  # (batch_size, 1) -> (n_agents * batch_size, 1)
-            sp_gamma = np.tile(sp_gamma, (self.num_agents, 1))  # (batch_size, 1) -> (n_agents * batch_size, 1)
+        if self.state_type == "EP":
+            gamma_buffer = np.ones(self.n_step + 1)
+            for i in range(1, self.n_step + 1):
+                gamma_buffer[i] = gamma_buffer[i - 1] * self.gamma
+            sp_reward = np.zeros((self.batch_size, 1))
+            gammas = np.full(self.batch_size, self.n_step)
+            for n in range(self.n_step - 1, -1, -1):
+                now = indices[n]
+                gammas[self.end_flag[now] > 0] = n + 1
+                sp_reward[self.end_flag[now] > 0] = 0.0
+                sp_reward = self.rewards[now] + self.gamma * sp_reward
+            sp_gamma = gamma_buffer[gammas].reshape(self.batch_size, 1)
+        elif self.state_type == "FP":
+            gamma_buffer = np.ones((self.num_agents, self.n_step + 1))
+            for i in range(1, self.n_step + 1):
+                gamma_buffer[:, i] = gamma_buffer[:, i - 1] * self.gamma
+            sp_reward = np.zeros((self.batch_size, self.num_agents, 1))
+            gammas = np.full((self.batch_size, self.num_agents), self.n_step)
+            for n in range(self.n_step - 1, -1, -1):
+                now = indices[n]
+                end_flag = np.column_stack(
+                    [self.end_flag[now[:, agent_id], agent_id] for agent_id in range(self.num_agents)]
+                )
+                gammas[end_flag > 0] = n + 1
+                sp_reward[end_flag > 0] = 0.0
+                rewards = np.expand_dims(
+                    np.column_stack([self.rewards[now[:, agent_id], agent_id] for agent_id in range(self.num_agents)]), axis=-1
+                )
+                sp_reward = rewards + self.gamma * sp_reward
+            sp_reward = np.concatenate(
+                sp_reward.transpose(1, 0, 2), axis=0
+            )
+            sp_gamma = np.concatenate(
+               [gamma_buffer[agent_id][gammas[:, agent_id]] for agent_id in range(self.num_agents)]
+            ).reshape(-1, 1)  # (n_agents * batch_size, ) -> (n_agents * batch_size, 1)
 
         if self.act_spaces[0].__class__.__name__ == 'Discrete':
             return (
@@ -280,7 +318,13 @@ class OffPolicyBuffer:
 
     def next(self, indices):
         """Get next indices"""
-        return (indices + (1 - self.end_flag[indices]) * self.n_rollout_threads) % self.buffer_size
+        if self.state_type == "EP":
+            return (indices + (1 - self.end_flag[indices]) * self.n_rollout_threads) % self.buffer_size
+        elif self.state_type == "FP":
+            end_flag = np.column_stack(
+                [self.end_flag[indices[:, agent_id], agent_id] for agent_id in range(self.num_agents)]
+            )  # (batch_size, n_agents)
+            return (indices + (1 - end_flag) * self.n_rollout_threads) % self.buffer_size
 
     def update_end_flag(self):
         """Update current end flag for computing n-step return.
@@ -289,8 +333,11 @@ class OffPolicyBuffer:
         self.unfinished_index = (
             self.idx - np.arange(self.n_rollout_threads) - 1 + self.cur_size
         ) % self.cur_size
-        self.end_flag = self.dones.copy().squeeze()
-        self.end_flag[self.unfinished_index] = True
+        self.end_flag = self.dones.copy().squeeze()  # EP: (batch_size), FP: (batch_size, n_agents)
+        if self.state_type == "EP":
+            self.end_flag[self.unfinished_index] = True
+        elif self.state_type == "FP":
+            self.end_flag[self.unfinished_index, :] = True
 
     def get_mean_rewards(self):
         """Get mean rewards of the buffer"""

@@ -13,7 +13,7 @@ device:
   torch_threads: 4
 train:
   # number of parallel environments for training data collection
-  n_rollout_threads: 40
+  n_rollout_threads: 20
   # number of total steps
   num_env_steps: 20000000
   # number of warmup steps
@@ -67,9 +67,9 @@ model:
   critic_lr: 0.0005
 algo:
   # whether to auto-tune temperature
-  auto_alpha: True
+  auto_alpha: False
   # temperature parameter
-  alpha: 0.2
+  alpha: 0.001
   # alpha learning rate
   alpha_lr: 0.0003
   # discount factor
