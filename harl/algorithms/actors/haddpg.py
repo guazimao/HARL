@@ -25,10 +25,11 @@ class HADDPG(OffPolicyBase):
         for p in self.target_actor.parameters():
             p.requires_grad = False
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.lr)
-        self.low = torch.tensor(act_space.low).to(**self.tpdv)
-        self.high = torch.tensor(act_space.high).to(**self.tpdv)
-        self.scale = (self.high - self.low) / 2
-        self.mean = (self.high + self.low) / 2
+        if act_space.__class__.__name__ == "Box":
+            self.low = torch.tensor(act_space.low).to(**self.tpdv)
+            self.high = torch.tensor(act_space.high).to(**self.tpdv)
+            self.scale = (self.high - self.low) / 2
+            self.mean = (self.high + self.low) / 2
         self.turn_off_grad()
 
     def get_actions(self, obs, available_actions=None, add_noise=False, onehot=True):

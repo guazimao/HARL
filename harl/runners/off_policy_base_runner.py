@@ -160,13 +160,11 @@ class OffPolicyBaseRunner:
 
         self.total_it = 0  # total iteration
 
-        if self.algo_args['algo']['auto_alpha']:
-            if self.args["algo"] == "hasac":
-                self.target_entropy = [-np.prod(self.envs.action_space[agent_id].shape)
-                                       for agent_id in range(self.num_agents)]
-            else:
-                self.target_entropy = [0.98 * np.log(np.prod(self.envs.action_space[agent_id].shape))
-                                       for agent_id in range(self.num_agents)]
+        if "auto_alpha" in self.algo_args['algo'].keys() and self.algo_args['algo']['auto_alpha']:
+            self.target_entropy = [-np.prod(self.envs.action_space[agent_id].shape)
+                                   for agent_id in range(self.num_agents)]
+            #     self.target_entropy = [0.98 * np.log(np.prod(self.envs.action_space[agent_id].shape))
+            #                            for agent_id in range(self.num_agents)]
             self.log_alpha = []
             self.alpha_optimizer = []
             self.alpha = []
@@ -175,7 +173,7 @@ class OffPolicyBaseRunner:
                 self.log_alpha.append(_log_alpha)
                 self.alpha_optimizer.append(torch.optim.Adam([_log_alpha], lr=self.algo_args['algo']['alpha_lr']))
                 self.alpha.append(torch.exp(_log_alpha.detach()))
-        else:
+        elif "alpha" in self.algo_args['algo'].keys():
             self.alpha = [self.algo_args['algo']['alpha']] * self.num_agents
 
     def run(self):
