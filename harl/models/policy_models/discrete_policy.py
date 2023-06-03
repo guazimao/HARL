@@ -6,10 +6,9 @@ from harl.models.base.mlp import MLPBase
 from harl.models.base.act import ACTLayer
 
 
-
 class DiscretePolicy(nn.Module):
     """
-    Actor network class for DiscreteHASAC. Outputs actions given observations.
+    Actor network class for discrete off-policy algorithms. Output actions given observations.
     :param args: (argparse.Namespace) arguments containing relevant model information.
     :param obs_space: (gym.Space) observation space.
     :param action_space: (gym.Space) action space.
@@ -57,13 +56,13 @@ class DiscretePolicy(nn.Module):
         actor_features = self.base(obs)
 
         actions, action_log_probs = self.act(actor_features, available_actions, deterministic)
-        return actions, action_log_probs
+        return actions
 
-    def get_probs(self, obs, available_actions=None):
+    def get_logits(self, obs, available_actions=None):
         obs = check(obs).to(**self.tpdv)
         if available_actions is not None:
             available_actions = check(available_actions).to(**self.tpdv)
 
         actor_features = self.base(obs)
 
-        return self.act.get_probs(actor_features, available_actions)
+        return self.act.get_logits(actor_features, available_actions)

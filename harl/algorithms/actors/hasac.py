@@ -6,6 +6,7 @@ from harl.utils.discrete_util import gumbel_softmax
 from harl.utils.envs_tools import check
 from harl.algorithms.actors.off_policy_base import OffPolicyBase
 
+
 class HASAC(OffPolicyBase):
     def __init__(self, args, obs_space, act_space, device=torch.device("cpu")):
         self.tpdv = dict(dtype=torch.float32, device=device)
@@ -37,7 +38,7 @@ class HASAC(OffPolicyBase):
         if self.action_type == "Box":
             actions, _ = self.actor(obs, stochastic=stochastic, with_logprob=False)
         else:
-            actions, _ = self.actor(obs, available_actions, stochastic)
+            actions = self.actor(obs, available_actions, stochastic)
         return actions
 
     def get_actions_with_logprobs(self, obs, available_actions=None, stochastic=True):
@@ -56,17 +57,16 @@ class HASAC(OffPolicyBase):
         if self.action_type == "Box":
             actions, logp_actions = self.actor(obs, stochastic=stochastic, with_logprob=True)
         elif self.action_type == "Discrete":
-            logits = torch.log(self.actor.get_probs(obs, available_actions) + 1e-5)
-            actions = gumbel_softmax(logits, hard=True, device=self.device)
+            logits = self.actor.get_logits(obs, available_actions)
+            actions = gumbel_softmax(logits, hard=True, device=self.device)  # onehot actions
             logp_actions = torch.sum(actions * logits, dim=-1, keepdim=True)
         elif self.action_type == "MultiDiscrete":
-            probs = self.actor.get_probs(obs, available_actions)
+            logits = self.actor.get_logits(obs, available_actions)
             actions = []
             logp_actions = []
-            for prob in probs:
-                logits = torch.log(prob + 1e-5)
-                action = gumbel_softmax(logits, hard=True, device=self.device)
-                logp_action = torch.sum(action * logits, dim=-1, keepdim=True)
+            for logit in logits:
+                action = gumbel_softmax(logit, hard=True, device=self.device)  # onehot actions
+                logp_action = torch.sum(action * logit, dim=-1, keepdim=True)
                 actions.append(action)
                 logp_actions.append(logp_action)
             actions = torch.cat(actions, dim=-1)

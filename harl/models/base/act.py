@@ -77,26 +77,25 @@ class ACTLayer(nn.Module):
 
         return actions, action_log_probs
 
-    def get_probs(self, x, available_actions=None):
-        """Compute action probabilities from inputs.
+    def get_logits(self, x, available_actions=None):
+        """Compute action logits from inputs.
         Args:
             x: (torch.Tensor) input to network.
             available_actions: (torch.Tensor) denotes which actions are available to agent
                                       (if None, all actions available)
         Returns:
-            action_probs: (torch.Tensor)
+            action_logits: (torch.Tensor)
         """
         if self._multidiscrete_action:
-            action_probs = []
+            action_logits = []
             for action_out in self.action_outs:
-                action_logit = action_out(x)
-                action_prob = action_logit.probs
-                action_probs.append(action_prob)
+                action_distribution = action_out(x, available_actions)
+                action_logits.append(action_distribution.logits)
         else:
-            action_logits = self.action_out(x, available_actions)
-            action_probs = action_logits.probs
+            action_distribution = self.action_out(x, available_actions)
+            action_logits = action_distribution.logits
 
-        return action_probs
+        return action_logits
 
     def evaluate_actions(self, x, action, available_actions=None, active_masks=None):
         """Compute action log probability, distribution entropy, and action distribution.

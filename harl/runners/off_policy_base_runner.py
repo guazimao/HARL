@@ -414,7 +414,14 @@ class OffPolicyBaseRunner:
         else:
             actions = []
             for agent_id in range(self.num_agents):
-                actions.append(_t2n(self.actor[agent_id].get_actions(obs[:, agent_id], add_random)))
+                if len(available_actions.shape) == 3:  # (n_threads, n_agents, action_number)
+                    actions.append(_t2n(self.actor[agent_id].get_actions(
+                        obs[:, agent_id], available_actions[:, agent_id], add_random, onehot=False))
+                    )
+                else:
+                    actions.append(
+                        _t2n(self.actor[agent_id].get_actions(obs[:, agent_id], add_noise=add_random, onehot=False))
+                    )
         return np.array(actions).transpose(1, 0, 2)
 
     def train(self):
