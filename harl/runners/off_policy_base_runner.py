@@ -391,23 +391,26 @@ class OffPolicyBaseRunner:
         if self.args["algo"] == "hasac":
             actions = []
             for agent_id in range(self.num_agents):
-                action = []
                 if self.algo_args['render']['use_render']:
+                    action = []
                     if available_actions[0] is None:
                         action.append(_t2n(self.actor[agent_id].get_actions(
-                            obs[0, agent_id], stochastic=add_random)))
+                            obs[0, agent_id], stochastic=add_random))
+                        )
                     else:
                         action.append(_t2n(self.actor[agent_id].get_actions(
-                            obs[0, agent_id], available_actions[0, agent_id], add_random)))
+                            obs[0, agent_id], available_actions[0, agent_id], add_random))
+                        )
+                    actions.append(action)
                 else:
-                    for thread in range(self.algo_args['train']['n_rollout_threads'] if add_random else self.algo_args['eval']['n_eval_rollout_threads']):
-                        if available_actions[thread] is None:
-                            action.append(_t2n(self.actor[agent_id].get_actions(obs[thread, agent_id], stochastic=add_random)))
-                        else:
-                            action.append(_t2n(self.actor[agent_id].get_actions(
-                                obs[thread, agent_id], available_actions[thread, agent_id], add_random))
-                            )
-                actions.append(action)
+                    if len(available_actions.shape) == 3:  # (n_threads, n_agents, action_number)
+                        actions.append(_t2n(self.actor[agent_id].get_actions(
+                            obs[:, agent_id], available_actions[:, agent_id], add_random))
+                        )
+                    else:  # (n_threads, ) of None
+                        actions.append(
+                            _t2n(self.actor[agent_id].get_actions(obs[:, agent_id], stochastic=add_random))
+                        )
         else:
             actions = []
             for agent_id in range(self.num_agents):
@@ -477,21 +480,27 @@ class OffPolicyBaseRunner:
                 if "smac" in self.args["env"]:
                     print(
                         "Eval win rate is {}, eval average episode rewards is {}, eval average episode length is {}.".format(
-                            eval_battles_won / eval_episode, eval_avg_rew, eval_avg_len))
+                            eval_battles_won / eval_episode, eval_avg_rew, eval_avg_len
+                        )
+                    )
                 elif "football" in self.args["env"]:
                     print(
                         "Eval score rate is {}, eval average episode rewards is {}, eval average episode length is {}.".format(
-                            eval_score_cnt / eval_episode, eval_avg_rew, eval_avg_len))
+                            eval_score_cnt / eval_episode, eval_avg_rew, eval_avg_len
+                        )
+                    )
                 else:
                     print(
                         f'Eval average episode reward is {eval_avg_rew}, eval average episode length is {eval_avg_len}.\n'
                     )
                 if "smac" in self.args["env"]:
                     self.log_file.write(
-                        ",".join(map(str, [step, eval_avg_rew, eval_avg_len, eval_battles_won / eval_episode])) + "\n")
+                        ",".join(map(str, [step, eval_avg_rew, eval_avg_len, eval_battles_won / eval_episode])) + "\n"
+                    )
                 elif "football" in self.args["env"]:
                     self.log_file.write(
-                        ",".join(map(str, [step, eval_avg_rew, eval_avg_len, eval_score_cnt / eval_episode])) + "\n")
+                        ",".join(map(str, [step, eval_avg_rew, eval_avg_len, eval_score_cnt / eval_episode])) + "\n"
+                    )
                 else:
                     self.log_file.write(",".join(map(str, [step, eval_avg_rew, eval_avg_len])) + "\n")
                 self.log_file.flush()
