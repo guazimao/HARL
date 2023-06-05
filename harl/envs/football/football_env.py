@@ -11,6 +11,9 @@ env_num_agents = {
     "academy_counterattack_hard": 4,
     "academy_corner": 11,
     "academy_single_goal_versus_lazy": 11,
+    "11_vs_11_stochastic": 11,
+    "11_vs_11_easy_stochastic": 11,
+    "11_vs_11_hard_stochastic": 11,
 }
 
 

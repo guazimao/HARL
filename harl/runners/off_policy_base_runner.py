@@ -149,7 +149,6 @@ class OffPolicyBaseRunner:
                 self.state_type,
             )
 
-        # TODO: check
         if self.algo_args['train']['use_popart'] is True:
             self.value_normalizer = PopArt(1, device=self.device)
         else:
@@ -389,26 +388,14 @@ class OffPolicyBaseRunner:
         if self.args["algo"] == "hasac":
             actions = []
             for agent_id in range(self.num_agents):
-                if self.algo_args['render']['use_render']:
-                    action = []
-                    if available_actions[0] is None:
-                        action.append(_t2n(self.actor[agent_id].get_actions(
-                            obs[0, agent_id], stochastic=add_random))
-                        )
-                    else:
-                        action.append(_t2n(self.actor[agent_id].get_actions(
-                            obs[0, agent_id], available_actions[0, agent_id], add_random))
-                        )
-                    actions.append(action)
-                else:
-                    if len(available_actions.shape) == 3:  # (n_threads, n_agents, action_number)
-                        actions.append(_t2n(self.actor[agent_id].get_actions(
-                            obs[:, agent_id], available_actions[:, agent_id], add_random))
-                        )
-                    else:  # (n_threads, ) of None
-                        actions.append(
-                            _t2n(self.actor[agent_id].get_actions(obs[:, agent_id], stochastic=add_random))
-                        )
+                if len(available_actions.shape) == 3:  # (n_threads, n_agents, action_number)
+                    actions.append(_t2n(self.actor[agent_id].get_actions(
+                        obs[:, agent_id], available_actions[:, agent_id], add_random))
+                    )
+                else:  # (n_threads, ) of None
+                    actions.append(
+                        _t2n(self.actor[agent_id].get_actions(obs[:, agent_id], stochastic=add_random))
+                    )
         else:
             actions = []
             for agent_id in range(self.num_agents):
