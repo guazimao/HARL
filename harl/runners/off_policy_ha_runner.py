@@ -4,6 +4,7 @@ import numpy as np
 import torch.nn.functional as F
 from harl.runners.off_policy_base_runner import OffPolicyBaseRunner
 
+
 class OffPolicyHARunner(OffPolicyBaseRunner):
     """Runner for off-policy HA algorithms."""
 
@@ -36,9 +37,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                     sp_next_available_actions[agent_id] if sp_next_available_actions is not None else None
                 )
                 next_actions.append(next_action)
-                next_logp_actions.append(
-                    torch.unsqueeze(next_logp_action, dim=1) if len(next_logp_action.shape) == 1 else next_logp_action
-                )
+                next_logp_actions.append(next_logp_action)
             self.critic.train(
                 sp_share_obs,
                 sp_actions,
@@ -89,6 +88,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                         actions.append(action)
                         logp_actions.append(logp_action)
                 # actions shape: (n_agents, batch_size, dim)
+                # logp_actions shape: (n_agents, batch_size, 1)
                 if self.fixed_order:
                     agent_order = list(range(self.num_agents))
                 else:
@@ -96,16 +96,15 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 for agent_id in agent_order:
                     self.actor[agent_id].turn_on_grad()
                     # train this agent
-                    actions[agent_id], logp_action = self.actor[agent_id].get_actions_with_logprobs(
+                    actions[agent_id], logp_actions[agent_id] = self.actor[agent_id].get_actions_with_logprobs(
                         sp_obs[agent_id],
                         sp_available_actions[agent_id] if sp_available_actions is not None else None
                     )
-                    logp_action = torch.unsqueeze(logp_action, dim=1) if len(logp_action.shape) == 1 else logp_action
-                    logp_actions[agent_id] = logp_action
                     if self.state_type == "EP":
+                        logp_action = logp_actions[agent_id]
                         actions_t = torch.cat(actions, dim=-1)
                     elif self.state_type == "FP":
-                        logp_action = torch.tile(logp_action, (self.num_agents, 1))
+                        logp_action = torch.tile(logp_actions[agent_id], (self.num_agents, 1))
                         actions_t = torch.tile(torch.cat(actions, dim=-1), (self.num_agents, 1))
                     value_pred = self.critic.get_values(sp_share_obs, actions_t)
                     if self.algo_args['algo']['use_policy_active_masks']:
