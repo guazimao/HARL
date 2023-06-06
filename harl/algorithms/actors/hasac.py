@@ -42,16 +42,15 @@ class HASAC(OffPolicyBase):
         return actions
 
     def get_actions_with_logprobs(self, obs, available_actions=None, stochastic=True):
-        """
-        get actions and logprobs of actions for observations.
-        params:
-        obs: (threads, dim)
-        available_actions: (np.ndarray) denotes which actions are available to agent
+        """Get actions and logprobs of actions for observations.
+        Args:
+            obs: (np.ndarray) observations of actor, shape is (batch_size, dim)
+            available_actions: (np.ndarray) denotes which actions are available to agent
                                  (if None, all actions available)
-        stochastic: (bool) stochastic actions or deterministic actions
-        returns:
-        actions: (threads, dim)
-        logp_actions: (threads, 1)
+            stochastic: (bool) stochastic actions or deterministic actions
+        Returns:
+            actions: (torch.Tensor) actions taken by this actor, shape is (batch_size, dim)
+            logp_actions: (torch.Tensor) log probabilities of actions taken by this actor, shape is (batch_size, 1)
         """
         obs = check(obs).to(**self.tpdv)
         if self.action_type == "Box":
