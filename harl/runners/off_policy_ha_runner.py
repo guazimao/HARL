@@ -7,7 +7,6 @@ from harl.runners.off_policy_base_runner import OffPolicyBaseRunner
 class OffPolicyHARunner(OffPolicyBaseRunner):
     """Runner for off-policy HA algorithms."""
 
-
     def train(self):
         """Train the model"""
         self.total_it += 1
@@ -33,7 +32,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
             next_logp_actions = []
             for agent_id in range(self.num_agents):
                 next_action, next_logp_action = self.actor[agent_id].get_actions_with_logprobs(
-                    sp_next_obs[agent_id], sp_next_available_actions[agent_id] if sp_next_available_actions is not None else None
+                    sp_next_obs[agent_id],
+                    sp_next_available_actions[agent_id] if sp_next_available_actions is not None else None
                 )
                 next_actions.append(next_action)
                 next_logp_actions.append(
@@ -57,7 +57,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
             for agent_id in range(self.num_agents):
                 next_actions.append(
                     self.actor[agent_id].get_target_actions(
-                        sp_next_obs[agent_id], sp_next_available_actions[agent_id] if sp_next_available_actions is not None else None
+                        sp_next_obs[agent_id],
+                        sp_next_available_actions[agent_id] if sp_next_available_actions is not None else None
                     )
                 )
             self.critic.train(
@@ -82,7 +83,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                 with torch.no_grad():
                     for agent_id in range(self.num_agents):
                         action, logp_action = self.actor[agent_id].get_actions_with_logprobs(
-                            sp_obs[agent_id], sp_available_actions[agent_id] if sp_available_actions is not None else None
+                            sp_obs[agent_id],
+                            sp_available_actions[agent_id] if sp_available_actions is not None else None
                         )
                         actions.append(action)
                         logp_actions.append(logp_action)
@@ -95,7 +97,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                     self.actor[agent_id].turn_on_grad()
                     # train this agent
                     actions[agent_id], logp_action = self.actor[agent_id].get_actions_with_logprobs(
-                        sp_obs[agent_id], sp_available_actions[agent_id] if sp_available_actions is not None else None
+                        sp_obs[agent_id],
+                        sp_available_actions[agent_id] if sp_available_actions is not None else None
                     )
                     logp_action = torch.unsqueeze(logp_action, dim=1) if len(logp_action.shape) == 1 else logp_action
                     logp_actions[agent_id] = logp_action
@@ -130,7 +133,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                         self.alpha_optimizer[agent_id].step()
                         self.alpha[agent_id] = (torch.exp(self.log_alpha[agent_id].detach()))
                     actions[agent_id], _ = self.actor[agent_id].get_actions_with_logprobs(
-                        sp_obs[agent_id], sp_available_actions[agent_id] if sp_available_actions is not None else None
+                        sp_obs[agent_id],
+                        sp_available_actions[agent_id] if sp_available_actions is not None else None
                     )
                 # train critic's alpha
                 if self.algo_args['algo']['auto_alpha']:
@@ -178,7 +182,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                         self.actor[agent_id].turn_on_grad()
                         # train this agent
                         actions[agent_id] = self.actor[agent_id].get_actions(
-                            sp_obs[agent_id], sp_available_actions[agent_id] if sp_available_actions is not None else None
+                            sp_obs[agent_id],
+                            sp_available_actions[agent_id] if sp_available_actions is not None else None
                         )
                         if self.state_type == "EP":
                             actions_t = torch.cat(actions, dim=-1)
@@ -202,7 +207,8 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                         self.actor[agent_id].actor_optimizer.step()
                         self.actor[agent_id].turn_off_grad()
                         actions[agent_id] = self.actor[agent_id].get_actions(
-                            sp_obs[agent_id], sp_available_actions[agent_id] if sp_available_actions is not None else None
+                            sp_obs[agent_id],
+                            sp_available_actions[agent_id] if sp_available_actions is not None else None
                         )
                 # soft update
                 for agent_id in range(self.num_agents):

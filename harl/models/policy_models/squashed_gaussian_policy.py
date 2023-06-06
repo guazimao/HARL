@@ -10,9 +10,19 @@ from harl.models.base.plain_mlp import PlainMLP
 LOG_STD_MAX = 2
 LOG_STD_MIN = -20
 
+
 class SquashedGaussianPolicy(nn.Module):
     """Squashed Gaussian policy network for HASAC."""
+
     def __init__(self, args, obs_space, action_space, act_limit, device=torch.device("cpu")):
+        """Initialize StochasticPolicy model.
+        Args:
+            args: (dict) arguments containing relevant model information.
+            obs_space: (gym.Space) observation space.
+            action_space: (gym.Space) action space.
+            act_limit: (gym.Space) action limit for clamping: critically, assumes all dimensions share the same bound!
+            device: (torch.device) specifies the device to run on (cpu/gpu).
+        """
         super().__init__()
         self.tpdv = dict(dtype=torch.float32, device=device)
         hidden_sizes = args["hidden_sizes"]

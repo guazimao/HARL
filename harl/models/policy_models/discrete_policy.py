@@ -7,15 +7,16 @@ from harl.models.base.act import ACTLayer
 
 
 class DiscretePolicy(nn.Module):
-    """
-    Actor network class for discrete off-policy algorithms. Output actions given observations.
-    :param args: (argparse.Namespace) arguments containing relevant model information.
-    :param obs_space: (gym.Space) observation space.
-    :param action_space: (gym.Space) action space.
-    :param device: (torch.device) specifies the device to run on (cpu/gpu).
-    """
+    """Actor network class for discrete off-policy algorithms. Output actions given observations."""
 
     def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
+        """Initialize StochasticPolicy model.
+        Args:
+            args: (dict) arguments containing relevant model information.
+            obs_space: (gym.Space) observation space.
+            action_space: (gym.Space) action space.
+            device: (torch.device) specifies the device to run on (cpu/gpu).
+        """
         super(DiscretePolicy, self).__init__()
         self.hidden_sizes = args["hidden_sizes"]
         self.args = args
@@ -38,15 +39,14 @@ class DiscretePolicy(nn.Module):
         self.to(device)
 
     def forward(self, obs, available_actions=None, stochastic=True):
-        """
-        Compute actions from the given inputs.
-        :param obs: (np.ndarray / torch.Tensor) observation inputs into network.
-        :param available_actions: (np.ndarray / torch.Tensor) denotes which actions are available to agent
+        """Compute actions from the given inputs.
+        Args:
+            obs: (np.ndarray / torch.Tensor) observation inputs into network.
+            available_actions: (np.ndarray / torch.Tensor) denotes which actions are available to agent
                                                               (if None, all actions available)
-        :param stochastic: (bool) whether to sample from action distribution or return the mode.
-
-        :return actions: (torch.Tensor) actions to take.
-        :return action_log_probs: (torch.Tensor) log probabilities of taken actions.
+            stochastic: (bool) whether to sample from action distribution or return the mode.
+        Returns:
+            actions: (torch.Tensor) actions to take.
         """
         obs = check(obs).to(**self.tpdv)
         deterministic = not stochastic
@@ -59,6 +59,14 @@ class DiscretePolicy(nn.Module):
         return actions
 
     def get_logits(self, obs, available_actions=None):
+        """Get action logits from the given inputs.
+        Args:
+            obs: (np.ndarray / torch.Tensor) input to network.
+            available_actions: (np.ndarray / torch.Tensor) denotes which actions are available to agent
+                                      (if None, all actions available)
+        Returns:
+            action_logits: (torch.Tensor) logits of actions for the given inputs.
+        """
         obs = check(obs).to(**self.tpdv)
         if available_actions is not None:
             available_actions = check(available_actions).to(**self.tpdv)

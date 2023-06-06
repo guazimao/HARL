@@ -78,13 +78,13 @@ class ACTLayer(nn.Module):
         return actions, action_log_probs
 
     def get_logits(self, x, available_actions=None):
-        """Compute action logits from inputs.
+        """Get action logits from inputs.
         Args:
             x: (torch.Tensor) input to network.
             available_actions: (torch.Tensor) denotes which actions are available to agent
                                       (if None, all actions available)
         Returns:
-            action_logits: (torch.Tensor)
+            action_logits: (torch.Tensor) logits of actions for the given inputs.
         """
         if self._multidiscrete_action:
             action_logits = []

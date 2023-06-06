@@ -12,8 +12,8 @@ import itertools
 
 class SoftTwinQCritic:
     """Soft Twin Q Critic.
-        Critic that learns two soft Q-functions. The action space can be continuous and discrete.
-        """
+    Critic that learns two soft Q-functions. The action space can be continuous and discrete.
+    """
 
     def __init__(self, args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu")):
         """Initialize the critic."""
