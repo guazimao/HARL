@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from harl.models.value_function_models.continuous_q_net import ContinuousQNet
-from harl.models.value_function_models.discrete_q_net import DiscreteQNet
 from harl.utils.envs_tools import check
 from harl.utils.models_tools import update_linear_schedule
 
@@ -23,12 +22,8 @@ class TwinQCritic:
         self.num_agents = num_agents
         self.state_type = state_type
         self.action_type = act_space[0].__class__.__name__
-        if act_space[0].__class__.__name__ == "Box":
-            self.critic = ContinuousQNet(args, share_obs_space, act_space, device)
-            self.critic2 = ContinuousQNet(args, share_obs_space, act_space, device)
-        else:
-            self.critic = DiscreteQNet(args, share_obs_space, act_space, device)
-            self.critic2 = DiscreteQNet(args, share_obs_space, act_space, device)
+        self.critic = ContinuousQNet(args, share_obs_space, act_space, device)
+        self.critic2 = ContinuousQNet(args, share_obs_space, act_space, device)
         self.target_critic = deepcopy(self.critic)
         self.target_critic2 = deepcopy(self.critic2)
         for param in self.target_critic.parameters():
