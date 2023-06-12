@@ -3,30 +3,38 @@ import copy
 import torch
 from harl.runners.off_policy_base_runner import OffPolicyBaseRunner
 
+
 class OffPolicyMARunner(OffPolicyBaseRunner):
     """Runner for off-policy MA algorithms."""
-
 
     def train(self):
         """Train the model"""
         self.total_it += 1
         data = self.buffer.sample()
         (
-            sp_share_obs,  # (batch_size, dim)
+            sp_share_obs,  # EP: (batch_size, dim), FP: (n_agents * batch_size, dim)
             sp_obs,  # (n_agents, batch_size, dim)
             sp_actions,  # (n_agents, batch_size, dim)
-            sp_reward,  # (batch_size, 1)
-            sp_done,  # (batch_size, 1)
-            sp_term,  # (batch_size, 1)
-            sp_next_share_obs,  # (batch_size, dim)
+            sp_available_actions,  # (n_agents, batch_size, dim)
+            sp_reward,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_done,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_valid_transition,  # (n_agents, batch_size, 1)
+            sp_term,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
+            sp_next_share_obs,  # EP: (batch_size, dim), FP: (n_agents * batch_size, dim)
             sp_next_obs,  # (n_agents, batch_size, dim)
-            sp_gamma,  # (batch_size, 1)
+            sp_next_available_actions,  # (n_agents, batch_size, dim)
+            sp_gamma,  # EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
         ) = data
         # train critic
         self.critic.turn_on_grad()
         next_actions = []
         for agent_id in range(self.num_agents):
-            next_actions.append(self.actor[agent_id].get_target_actions(sp_next_obs[agent_id]))
+            next_actions.append(
+                self.actor[agent_id].get_target_actions(
+                    sp_next_obs[agent_id],
+                    sp_next_available_actions[agent_id] if sp_next_available_actions is not None else None
+                )
+            )
         self.critic.train(
             sp_share_obs,
             sp_actions,
@@ -36,6 +44,7 @@ class OffPolicyMARunner(OffPolicyBaseRunner):
             sp_next_share_obs,
             next_actions,
             sp_gamma,
+            self.value_normalizer
         )
         self.critic.turn_off_grad()
         if self.total_it % self.policy_freq == 0:
@@ -45,7 +54,10 @@ class OffPolicyMARunner(OffPolicyBaseRunner):
                 actions = copy.deepcopy(torch.tensor(sp_actions)).to(self.device)
                 self.actor[agent_id].turn_on_grad()
                 # train this agent
-                actions[agent_id] = self.actor[agent_id].get_actions(sp_obs[agent_id], False)
+                actions[agent_id] = self.actor[agent_id].get_actions(
+                    sp_obs[agent_id],
+                    sp_available_actions[agent_id] if sp_available_actions is not None else None
+                )
                 actions_list = [a for a in actions]
                 actions_t = torch.cat(actions_list, dim=-1)
                 value_pred = self.critic.get_values(sp_share_obs, actions_t)
