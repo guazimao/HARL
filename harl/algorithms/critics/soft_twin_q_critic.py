@@ -171,7 +171,8 @@ class SoftTwinQCritic:
                 q_targets = reward + gamma * (
                         check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) - self.alpha * next_logp_actions
                 ) * (1 - term)
-                q_targets = check(value_normalizer(q_targets)).to(**self.tpdv)
+                value_normalizer.update(q_targets)
+                q_targets = check(value_normalizer.normalize(q_targets)).to(**self.tpdv)
             else:
                 q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - term)
         else:
@@ -179,7 +180,8 @@ class SoftTwinQCritic:
                 q_targets = reward + gamma * (
                         check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) - self.alpha * next_logp_actions
                 ) * (1 - done)
-                q_targets = value_normalizer(q_targets).to(**self.tpdv)
+                value_normalizer.update(q_targets)
+                q_targets = check(value_normalizer.normalize(q_targets)).to(**self.tpdv)
             else:
                 q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - done)
         if self.use_huber_loss:

@@ -9,7 +9,7 @@ class DeterministicPolicy(nn.Module):
     """Deterministic policy network for continuous action space."""
 
     def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
-        """Initialize StochasticPolicy model.
+        """Initialize DeterministicPolicy model.
         Args:
             args: (dict) arguments containing relevant model information.
             obs_space: (gym.Space) observation space.

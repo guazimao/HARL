@@ -146,13 +146,15 @@ class TwinQCritic:
         if self.use_proper_time_limits:
             if value_normalizer is not None:
                 q_targets = reward + gamma * check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) * (1 - term)
-                q_targets = check(value_normalizer(q_targets)).to(**self.tpdv)
+                value_normalizer.update(q_targets)
+                q_targets = check(value_normalizer.normalize(q_targets)).to(**self.tpdv)
             else:
                 q_targets = reward + gamma * next_q_values * (1 - term)
         else:
             if value_normalizer is not None:
                 q_targets = reward + gamma * check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) * (1 - done)
-                q_targets = check(value_normalizer(q_targets)).to(**self.tpdv)
+                value_normalizer.update(q_targets)
+                q_targets = check(value_normalizer.normalize(q_targets)).to(**self.tpdv)
             else:
                 q_targets = reward + gamma * next_q_values * (1 - done)
         if self.use_huber_loss:
