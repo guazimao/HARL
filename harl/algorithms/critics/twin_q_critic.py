@@ -98,7 +98,7 @@ class TwinQCritic:
             next_share_obs: EP: (batch_size, dim), FP: (n_agents * batch_size, dim)
             next_actions: (n_agents, batch_size, dim)
             gamma: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
-            value_normalizer: (PopArt) normalize the rewards, denormalize critic outputs.
+            value_normalizer: (ValueNorm) normalize the rewards, denormalize critic outputs.
         """
         assert share_obs.__class__.__name__ == "ndarray"
         assert actions.__class__.__name__ == "ndarray"

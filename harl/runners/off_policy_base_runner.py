@@ -4,7 +4,7 @@ import time
 import torch
 import numpy as np
 import setproctitle
-from harl.common.popart import PopArt
+from harl.common.valuenorm import ValueNorm
 from torch.distributions import Categorical
 from harl.utils.trans_tools import _t2n
 from harl.utils.envs_tools import (
@@ -149,8 +149,8 @@ class OffPolicyBaseRunner:
                 self.state_type,
             )
 
-        if self.algo_args['train']['use_popart'] is True:
-            self.value_normalizer = PopArt(1, device=self.device)
+        if self.algo_args['train']['use_valuenorm'] is True:
+            self.value_normalizer = ValueNorm(1, device=self.device)
         else:
             self.value_normalizer = None
 

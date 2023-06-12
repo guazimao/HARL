@@ -118,7 +118,7 @@ class SoftTwinQCritic:
             next_actions: (n_agents, batch_size, dim)
             next_logp_actions: (n_agents, batch_size, 1)
             gamma: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
-            value_normalizer: (PopArt) normalize the rewards, denormalize critic outputs.
+            value_normalizer: (ValueNorm) normalize the rewards, denormalize critic outputs.
         """
         assert share_obs.__class__.__name__ == "ndarray"
         assert actions.__class__.__name__ == "ndarray"
