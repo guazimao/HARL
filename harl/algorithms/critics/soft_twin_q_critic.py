@@ -118,7 +118,7 @@ class SoftTwinQCritic:
             next_actions: (n_agents, batch_size, dim)
             next_logp_actions: (n_agents, batch_size, 1)
             gamma: EP: (batch_size, 1), FP: (n_agents * batch_size, 1)
-            value_normalizer: (PopArt) normalize the rewards, denormalize critic outputs.
+            value_normalizer: (ValueNorm) normalize the rewards, denormalize critic outputs.
         """
         assert share_obs.__class__.__name__ == "ndarray"
         assert actions.__class__.__name__ == "ndarray"
@@ -171,7 +171,8 @@ class SoftTwinQCritic:
                 q_targets = reward + gamma * (
                         check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) - self.alpha * next_logp_actions
                 ) * (1 - term)
-                q_targets = check(value_normalizer(q_targets)).to(**self.tpdv)
+                value_normalizer.update(q_targets)
+                q_targets = check(value_normalizer.normalize(q_targets)).to(**self.tpdv)
             else:
                 q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - term)
         else:
@@ -179,7 +180,8 @@ class SoftTwinQCritic:
                 q_targets = reward + gamma * (
                         check(value_normalizer.denormalize(next_q_values)).to(**self.tpdv) - self.alpha * next_logp_actions
                 ) * (1 - done)
-                q_targets = value_normalizer(q_targets).to(**self.tpdv)
+                value_normalizer.update(q_targets)
+                q_targets = check(value_normalizer.normalize(q_targets)).to(**self.tpdv)
             else:
                 q_targets = reward + gamma * (next_q_values - self.alpha * next_logp_actions) * (1 - done)
         if self.use_huber_loss:

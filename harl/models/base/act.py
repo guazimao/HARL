@@ -19,7 +19,7 @@ class ACTLayer(nn.Module):
         """
         super(ACTLayer, self).__init__()
         self.action_type = action_space.__class__.__name__
-        self._multidiscrete_action = False
+        self.multidiscrete_action = False
 
         if action_space.__class__.__name__ == "Discrete":
             action_dim = action_space.n
@@ -32,7 +32,7 @@ class ACTLayer(nn.Module):
                 inputs_dim, action_dim, initialization_method, gain, args
             )
         elif action_space.__class__.__name__ == "MultiDiscrete":
-            self._multidiscrete_action = True
+            self.multidiscrete_action = True
             action_dims = action_space.nvec
             action_outs = []
             for action_dim in action_dims:
@@ -51,7 +51,7 @@ class ACTLayer(nn.Module):
             action_log_probs: (torch.Tensor) log probabilities of taken actions.
         """
 
-        if self._multidiscrete_action:
+        if self.multidiscrete_action:
             actions = []
             action_log_probs = []
             for action_out in self.action_outs:
@@ -86,7 +86,7 @@ class ACTLayer(nn.Module):
         Returns:
             action_logits: (torch.Tensor) logits of actions for the given inputs.
         """
-        if self._multidiscrete_action:
+        if self.multidiscrete_action:
             action_logits = []
             for action_out in self.action_outs:
                 action_distribution = action_out(x, available_actions)
@@ -110,7 +110,7 @@ class ACTLayer(nn.Module):
             dist_entropy: (torch.Tensor) action distribution entropy for the given inputs.
             action_distribution: (torch.distributions) action distribution.
         """
-        if self._multidiscrete_action:
+        if self.multidiscrete_action:
             action = torch.transpose(action, 0, 1)
             action_log_probs = []
             dist_entropy = []

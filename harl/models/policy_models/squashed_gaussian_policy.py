@@ -15,12 +15,12 @@ class SquashedGaussianPolicy(nn.Module):
     """Squashed Gaussian policy network for HASAC."""
 
     def __init__(self, args, obs_space, action_space, act_limit, device=torch.device("cpu")):
-        """Initialize StochasticPolicy model.
+        """Initialize SquashedGaussianPolicy model.
         Args:
             args: (dict) arguments containing relevant model information.
             obs_space: (gym.Space) observation space.
             action_space: (gym.Space) action space.
-            act_limit: (gym.Space) action limit for clamping: critically, assumes all dimensions share the same bound!
+            act_limit: (float) action limit for clamping (assumes all dimensions share the same bound).
             device: (torch.device) specifies the device to run on (cpu/gpu).
         """
         super().__init__()

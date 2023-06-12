@@ -10,7 +10,7 @@ class DiscretePolicy(nn.Module):
     """Actor network class for discrete off-policy algorithms. Output actions given observations."""
 
     def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
-        """Initialize StochasticPolicy model.
+        """Initialize DiscretePolicy model.
         Args:
             args: (dict) arguments containing relevant model information.
             obs_space: (gym.Space) observation space.
