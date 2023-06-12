@@ -1,4 +1,4 @@
-"""Tools for HARL-Toolbox."""
+"""Tools for HARL."""
 import copy
 import math
 import torch
@@ -64,7 +64,7 @@ def get_init_method(initialization_method):
 def huber_loss(e, d):
     """Huber loss."""
     a = (abs(e) <= d).float()
-    b = (e > d).float()
+    b = (abs(e) > d).float()
     return a * e**2 / 2 + b * d * (abs(e) - d / 2)
 
 
