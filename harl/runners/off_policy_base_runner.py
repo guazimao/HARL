@@ -160,10 +160,12 @@ class OffPolicyBaseRunner:
         self.total_it = 0  # total iteration
 
         if "auto_alpha" in self.algo_args['algo'].keys() and self.algo_args['algo']['auto_alpha']:
-            self.target_entropy = [-np.prod(self.envs.action_space[agent_id].shape)
-                                   for agent_id in range(self.num_agents)]
-            #     self.target_entropy = [0.98 * np.log(np.prod(self.envs.action_space[agent_id].shape))
-            #                            for agent_id in range(self.num_agents)]
+            self.target_entropy = []
+            for agent_id in range(self.num_agents):
+                if self.envs.action_space[agent_id].__class__.__name__ == "Box":  # Differential entropy can be negative
+                    self.target_entropy.append(-np.prod(self.envs.action_space[agent_id].shape))
+                else:  # Discrete entropy is always positive. Thus we set the max possible entropy as the target entropy
+                    self.target_entropy.append(-0.98 * np.log(1.0 / np.prod(self.envs.action_space[agent_id].shape)))
             self.log_alpha = []
             self.alpha_optimizer = []
             self.alpha = []
