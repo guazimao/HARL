@@ -149,7 +149,7 @@ class OffPolicyBaseRunner:
                 self.state_type,
             )
 
-        if self.algo_args['train']['use_valuenorm'] is True:
+        if "use_valuenorm" in self.algo_args['train'].keys() and self.algo_args['train']['use_valuenorm']:
             self.value_normalizer = ValueNorm(1, device=self.device)
         else:
             self.value_normalizer = None
@@ -372,8 +372,8 @@ class OffPolicyBaseRunner:
             actions.append(action)
         if self.envs.action_space[agent_id].__class__.__name__ == "Discrete":
             return np.expand_dims(np.array(actions).transpose(1, 0), axis=-1)
-        else:
-            return np.array(actions).transpose(1, 0, 2)
+
+        return np.array(actions).transpose(1, 0, 2)
 
     @torch.no_grad()
     def get_actions(self, obs, available_actions=None, add_random=True):
@@ -399,14 +399,7 @@ class OffPolicyBaseRunner:
         else:
             actions = []
             for agent_id in range(self.num_agents):
-                if len(available_actions.shape) == 3:  # (n_threads, n_agents, action_number)
-                    actions.append(_t2n(self.actor[agent_id].get_actions(
-                        obs[:, agent_id], available_actions[:, agent_id], add_random, onehot=False))
-                    )
-                else:
-                    actions.append(
-                        _t2n(self.actor[agent_id].get_actions(obs[:, agent_id], add_noise=add_random, onehot=False))
-                    )
+                actions.append(_t2n(self.actor[agent_id].get_actions(obs[:, agent_id], add_random)))
         return np.array(actions).transpose(1, 0, 2)
 
     def train(self):

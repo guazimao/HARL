@@ -1,4 +1,4 @@
-"""Soft Twin Q Critic."""
+"""Soft Twin Continuous Q Critic."""
 import numpy as np
 import torch
 from copy import deepcopy
@@ -9,8 +9,8 @@ from harl.utils.models_tools import update_linear_schedule
 import itertools
 
 
-class SoftTwinQCritic:
-    """Soft Twin Q Critic.
+class SoftTwinContinuousQCritic:
+    """Soft Twin Continuous Q Critic.
     Critic that learns two soft Q-functions. The action space can be continuous and discrete.
     """
 
