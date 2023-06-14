@@ -4,7 +4,7 @@ from copy import deepcopy
 import torch
 from harl.models.value_function_models.continuous_q_net import ContinuousQNet
 from harl.utils.envs_tools import check
-from harl.utils.models_tools import update_linear_schedule
+from harl.utils.models_tools import update_linear_schedule, mse_loss
 
 
 class TwinContinuousQCritic:
@@ -112,10 +112,10 @@ class TwinContinuousQCritic:
         else:
             q_targets = reward + gamma * next_q_values * (1 - done)
         critic_loss1 = torch.mean(
-            torch.nn.functional.mse_loss(self.critic(share_obs, actions), q_targets)
+            mse_loss(self.critic(share_obs, actions) - q_targets)
         )
         critic_loss2 = torch.mean(
-            torch.nn.functional.mse_loss(self.critic2(share_obs, actions), q_targets)
+            mse_loss(self.critic2(share_obs, actions) - q_targets)
         )
         critic_loss = critic_loss1 + critic_loss2
         self.critic_optimizer.zero_grad()

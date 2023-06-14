@@ -3,7 +3,7 @@ from copy import deepcopy
 import torch
 from harl.models.value_function_models.dueling_q_net import DuelingQNet
 from harl.utils.envs_tools import check
-from harl.utils.models_tools import update_linear_schedule
+from harl.utils.models_tools import update_linear_schedule, mse_loss
 
 
 class DiscreteQCritic:
@@ -118,7 +118,7 @@ class DiscreteQCritic:
         else:
             q_targets = reward + gamma * next_q_values * (1 - done)
         critic_loss = torch.mean(
-            torch.nn.functional.mse_loss(torch.gather(self.critic(share_obs), 1, action), q_targets)
+            mse_loss(torch.gather(self.critic(share_obs), 1, action) - q_targets)
         )
         self.critic_optimizer.zero_grad()
         critic_loss.backward()

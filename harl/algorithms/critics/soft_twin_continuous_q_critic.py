@@ -2,8 +2,8 @@
 import numpy as np
 import torch
 from harl.algorithms.critics.twin_continuous_q_critic import TwinContinuousQCritic
-import torch.nn.functional as F
 from harl.utils.envs_tools import check
+from harl.utils.models_tools import huber_loss, mse_loss
 
 
 class SoftTwinContinuousQCritic(TwinContinuousQCritic):
@@ -142,32 +142,32 @@ class SoftTwinContinuousQCritic(TwinContinuousQCritic):
         if self.use_huber_loss:
             if self.state_type == "FP" and self.use_policy_active_masks:
                 critic_loss1 = torch.sum(
-                    F.huber_loss(self.critic(share_obs, actions), q_targets, delta=self.huber_delta) * valid_transition
+                    huber_loss(self.critic(share_obs, actions) - q_targets, self.huber_delta) * valid_transition
                 ) / valid_transition.sum()
                 critic_loss2 = torch.mean(
-                    F.huber_loss(self.critic2(share_obs, actions), q_targets, delta=self.huber_delta) * valid_transition
+                    huber_loss(self.critic2(share_obs, actions) - q_targets, self.huber_delta) * valid_transition
                 ) / valid_transition.sum()
             else:
                 critic_loss1 = torch.mean(
-                    F.huber_loss(self.critic(share_obs, actions), q_targets, delta=self.huber_delta)
+                    huber_loss(self.critic(share_obs, actions) - q_targets, self.huber_delta)
                 )
                 critic_loss2 = torch.mean(
-                    F.huber_loss(self.critic2(share_obs, actions), q_targets, delta=self.huber_delta)
+                    huber_loss(self.critic2(share_obs, actions) - q_targets, self.huber_delta)
                 )
         else:
             if self.state_type == "FP" and self.use_policy_active_masks:
                 critic_loss1 = torch.sum(
-                    F.mse_loss(self.critic(share_obs, actions), q_targets) * valid_transition
+                    mse_loss(self.critic(share_obs, actions) - q_targets) * valid_transition
                 ) / valid_transition.sum()
                 critic_loss2 = torch.sum(
-                    F.mse_loss(self.critic2(share_obs, actions), q_targets) * valid_transition
+                    mse_loss(self.critic2(share_obs, actions) - q_targets) * valid_transition
                 ) / valid_transition.sum()
             else:
                 critic_loss1 = torch.mean(
-                    F.mse_loss(self.critic(share_obs, actions), q_targets)
+                    mse_loss(self.critic(share_obs, actions) - q_targets)
                 )
                 critic_loss2 = torch.mean(
-                    F.mse_loss(self.critic2(share_obs, actions), q_targets)
+                    mse_loss(self.critic2(share_obs, actions) - q_targets)
                 )
         critic_loss = critic_loss1 + critic_loss2
         self.critic_optimizer.zero_grad()

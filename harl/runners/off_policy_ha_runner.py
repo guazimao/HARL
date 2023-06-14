@@ -1,7 +1,7 @@
 """Runner for off-policy HARL algorithms."""
 import torch
 import numpy as np
-import torch.nn.functional as F
+from harl.utils.models_tools import mse_loss
 from harl.runners.off_policy_base_runner import OffPolicyBaseRunner
 
 
@@ -152,7 +152,7 @@ class OffPolicyHARunner(OffPolicyBaseRunner):
                         # critic preds
                         critic_values = get_values()
                         # update
-                        actor_loss = torch.mean(F.mse_loss(actor_values, critic_values))
+                        actor_loss = torch.mean(mse_loss(actor_values - critic_values))
                         self.actor[agent_id].actor_optimizer.zero_grad()
                         actor_loss.backward()
                         self.actor[agent_id].actor_optimizer.step()
