@@ -360,6 +360,9 @@ class OffPolicyBaseRunner:
     
     def sample_actions(self, available_actions=None):
         """Sample random actions for warmup.
+        Args:
+            available_actions: (np.ndarray) denotes which actions are available to agent (if None, all actions available),
+                                 shape is (n_threads, n_agents, action_number) or (n_threads, ) of None
         Returns:
             actions: (np.ndarray) sampled actions, shape is (n_threads, n_agents, dim)
         """
@@ -382,7 +385,8 @@ class OffPolicyBaseRunner:
         """Get actions for rollout.
         Args:
             obs: (np.ndarray) input observation, shape is (n_threads, n_agents, dim)
-            available_actions: (threads, n_agents, dim)
+            available_actions: (np.ndarray) denotes which actions are available to agent (if None, all actions available),
+                                 shape is (n_threads, n_agents, action_number) or (n_threads, ) of None
             add_random: (bool) whether to add randomness
         Returns:
             actions: (np.ndarray) agent actions, shape is (n_threads, n_agents, dim)

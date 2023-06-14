@@ -6,7 +6,7 @@ from harl.utils.envs_tools import get_shape_from_obs_space, get_shape_from_act_s
 
 class OffPolicyBuffer:
     """Off-policy buffer that could use both Environment-Provided (EP) and Feature-Pruned (FP) state.
-    When FP state is used, the critic takes different global state as input for different actors. Thus, OffPolicyBuffer has an extra dimension for number of agents`.
+    When FP state is used, the critic takes different global state as input for different actors. Thus, OffPolicyBuffer has an extra dimension for number of agents.
     """
 
     def __init__(self, args, share_obs_space, num_agents, obs_spaces, act_spaces, state_type):
