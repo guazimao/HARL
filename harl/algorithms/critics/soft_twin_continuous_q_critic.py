@@ -3,33 +3,22 @@ import numpy as np
 import torch
 from copy import deepcopy
 from harl.models.value_function_models.continuous_q_net import ContinuousQNet
+from harl.algorithms.critics.twin_continuous_q_critic import TwinContinuousQCritic
 import torch.nn.functional as F
 from harl.utils.envs_tools import check
 from harl.utils.models_tools import update_linear_schedule
 import itertools
 
 
-class SoftTwinContinuousQCritic:
+class SoftTwinContinuousQCritic(TwinContinuousQCritic):
     """Soft Twin Continuous Q Critic.
     Critic that learns two soft Q-functions. The action space can be continuous and discrete.
     """
 
     def __init__(self, args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu")):
         """Initialize the critic."""
-        self.tpdv = dict(dtype=torch.float32, device=device)
+        super().__init__(args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu"))
         self.tpdv_a = dict(dtype=torch.int64, device=device)
-        self.act_space = act_space
-        self.num_agents = num_agents
-        self.state_type = state_type
-        self.action_type = act_space[0].__class__.__name__
-        self.critic = ContinuousQNet(args, share_obs_space, act_space, device)
-        self.critic2 = ContinuousQNet(args, share_obs_space, act_space, device)
-        self.target_critic = deepcopy(self.critic)
-        self.target_critic2 = deepcopy(self.critic2)
-        for p in self.target_critic.parameters():
-            p.requires_grad = False
-        for p in self.target_critic2.parameters():
-            p.requires_grad = False
         self.auto_alpha = args['auto_alpha']
         if self.auto_alpha:
             self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
@@ -37,38 +26,9 @@ class SoftTwinContinuousQCritic:
             self.alpha = torch.exp(self.log_alpha.detach())
         else:
             self.alpha = args['alpha']
-        self.gamma = args["gamma"]
-        self.critic_lr = args["critic_lr"]
-        self.polyak = args["polyak"]
         self.use_policy_active_masks = args["use_policy_active_masks"]
-        self.use_proper_time_limits = args["use_proper_time_limits"]
         self.use_huber_loss = args["use_huber_loss"]
         self.huber_delta = args["huber_delta"]
-        critic_params = itertools.chain(self.critic.parameters(), self.critic2.parameters())
-        self.critic_optimizer = torch.optim.Adam(
-            critic_params,
-            lr=self.critic_lr,
-        )
-        self.turn_off_grad()
-
-    def lr_decay(self, step, steps):
-        """Decay the actor and critic learning rates.
-        Args:
-            step: (int) current training step.
-            steps: (int) total number of training steps.
-        """
-        update_linear_schedule(self.critic_optimizer, step, steps, self.critic_lr)
-
-    def soft_update(self):
-        """Soft update the target networks."""
-        for param_target, param in zip(self.target_critic.parameters(), self.critic.parameters()):
-            param_target.data.copy_(
-                param_target.data * (1.0 - self.polyak) + param.data * self.polyak
-            )
-        for param_target, param in zip(self.target_critic2.parameters(), self.critic2.parameters()):
-            param_target.data.copy_(
-                param_target.data * (1.0 - self.polyak) + param.data * self.polyak
-            )
 
     def update_alpha(self, logp_actions, target_entropy):
         """Auto-tune the temperature parameter alpha."""
@@ -213,41 +173,3 @@ class SoftTwinContinuousQCritic:
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
-
-    def save(self, save_dir):
-        """Save the model parameters."""
-        torch.save(self.critic.state_dict(), str(save_dir) + "/critic_agent" + ".pt")
-        torch.save(
-            self.target_critic.state_dict(),
-            str(save_dir) + "/target_critic_agent" + ".pt"
-        )
-        torch.save(self.critic2.state_dict(), str(save_dir) + "/critic_agent2" + ".pt")
-        torch.save(
-            self.target_critic2.state_dict(),
-            str(save_dir) + "/target_critic_agent2" + ".pt"
-        )
-
-    def restore(self, model_dir):
-        """Restore the model parameters."""
-        critic_state_dict = torch.load(str(model_dir) + "/critic_agent" + ".pt")
-        self.critic.load_state_dict(critic_state_dict)
-        target_critic_state_dict = torch.load(str(model_dir) + "/target_critic_agent" + ".pt")
-        self.target_critic.load_state_dict(target_critic_state_dict)
-        critic_state_dict2 = torch.load(str(model_dir) + "/critic_agent2" + ".pt")
-        self.critic2.load_state_dict(critic_state_dict2)
-        target_critic_state_dict2 = torch.load(str(model_dir) + "/target_critic_agent2" + ".pt")
-        self.target_critic2.load_state_dict(target_critic_state_dict2)
-
-    def turn_on_grad(self):
-        """Turn on the gradient for the critic network."""
-        for param in self.critic.parameters():
-            param.requires_grad = True
-        for param in self.critic2.parameters():
-            param.requires_grad = True
-
-    def turn_off_grad(self):
-        """Turn off the gradient for the critic network."""
-        for param in self.critic.parameters():
-            param.requires_grad = False
-        for param in self.critic2.parameters():
-            param.requires_grad = False

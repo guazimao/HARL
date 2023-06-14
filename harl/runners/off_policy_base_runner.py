@@ -22,7 +22,8 @@ from harl.utils.configs_tools import (
 )
 from harl.algorithms.actors import ALGO_REGISTRY
 from harl.algorithms.critics import CRITIC_REGISTRY
-from harl.common.buffers.off_policy_buffer import OffPolicyBuffer
+from harl.common.buffers.off_policy_buffer_ep import OffPolicyBufferEP
+from harl.common.buffers.off_policy_buffer_fp import OffPolicyBufferFP
 
 
 class OffPolicyBaseRunner:
@@ -140,14 +141,24 @@ class OffPolicyBaseRunner:
                 self.state_type,
                 device=self.device,
             )
-            self.buffer = OffPolicyBuffer(
-                {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
-                self.envs.share_observation_space[0],
-                self.num_agents,
-                self.envs.observation_space,
-                self.envs.action_space,
-                self.state_type,
-            )
+            if self.state_type == "EP":
+                self.buffer = OffPolicyBufferEP(
+                    {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
+                    self.envs.share_observation_space[0],
+                    self.num_agents,
+                    self.envs.observation_space,
+                    self.envs.action_space,
+                )
+            elif self.state_type == "FP":
+                self.buffer = OffPolicyBufferFP(
+                    {**algo_args["train"], **algo_args["model"], **algo_args["algo"]},
+                    self.envs.share_observation_space[0],
+                    self.num_agents,
+                    self.envs.observation_space,
+                    self.envs.action_space,
+                )
+            else:
+                raise NotImplementedError
 
         if "use_valuenorm" in self.algo_args['train'].keys() and self.algo_args['train']['use_valuenorm']:
             self.value_normalizer = ValueNorm(1, device=self.device)
