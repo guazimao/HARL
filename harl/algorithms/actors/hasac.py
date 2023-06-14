@@ -1,7 +1,7 @@
 """HASAC algorithm."""
 import torch
 from harl.models.policy_models.squashed_gaussian_policy import SquashedGaussianPolicy
-from harl.models.policy_models.discrete_policy import DiscretePolicy
+from harl.models.policy_models.stochastic_mlp_policy import StochasticMlpPolicy
 from harl.utils.discrete_util import gumbel_softmax
 from harl.utils.envs_tools import check
 from harl.algorithms.actors.off_policy_base import OffPolicyBase
@@ -18,7 +18,7 @@ class HASAC(OffPolicyBase):
         if act_space.__class__.__name__ == "Box":
             self.actor = SquashedGaussianPolicy(args, obs_space, act_space, device)
         else:
-            self.actor = DiscretePolicy(args, obs_space, act_space, device)
+            self.actor = StochasticMlpPolicy(args, obs_space, act_space, device)
 
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=self.lr)
         self.turn_off_grad()

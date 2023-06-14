@@ -6,18 +6,18 @@ from harl.models.base.mlp import MLPBase
 from harl.models.base.act import ACTLayer
 
 
-class DiscretePolicy(nn.Module):
-    """Actor network class for discrete off-policy algorithms. Output actions given observations."""
+class StochasticMlpPolicy(nn.Module):
+    """Stochastic policy model that only uses MLP network. Outputs actions given observations."""
 
     def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
-        """Initialize DiscretePolicy model.
+        """Initialize StochasticMlpPolicy model.
         Args:
             args: (dict) arguments containing relevant model information.
             obs_space: (gym.Space) observation space.
             action_space: (gym.Space) action space.
             device: (torch.device) specifies the device to run on (cpu/gpu).
         """
-        super(DiscretePolicy, self).__init__()
+        super(StochasticMlpPolicy, self).__init__()
         self.hidden_sizes = args["hidden_sizes"]
         self.args = args
         self.gain = args["gain"]
