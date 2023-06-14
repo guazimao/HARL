@@ -16,9 +16,6 @@ class HAA2C(OnPolicyBase):
             act_space: (gym.spaces) action space.
             device: (torch.device) device to use for tensor operations.
         """
-        assert (
-                act_space.__class__.__name__ == "Box" or "Discrete"
-        ), "only continuous and discrete action space is supported by HAA2C."
         super(HAA2C, self).__init__(args, obs_space, act_space, device)
 
         self.a2c_epoch = args["a2c_epoch"]

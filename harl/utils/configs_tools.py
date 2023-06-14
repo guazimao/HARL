@@ -65,7 +65,7 @@ def get_task_name(env, env_args):
     elif env == "dexhands":
         task = env_args["task"]
     elif env == "lag":
-        task = f"{env_args['task']}-{env_args['scenario']}"
+        task = f"{env_args['scenario']}-{env_args['task']}"
     return task
 
 

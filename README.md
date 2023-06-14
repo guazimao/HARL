@@ -202,16 +202,17 @@ After these steps, you can apply the algorithms immediately as above.
 
 ### Application Scope of Algorithms
 
-|        | Continuous action space | Discrete action space |
-| :----: | :---------------------: | :-------------------: |
-| HAPPO  | √                       | √                     |
-| HATRPO | √                       | √                     |
-| HAA2C  | √                       | √                     |
-| HADDPG | √                       |                       |
-| HATD3  | √                       |                       |
-| HAD3QN |                         | √                     |
-| MAPPO  | √                       | √                     |
-| MADDPG | √                       |                       |
+|        | Continuous action space | Discrete action space | Multi Discrete action space |
+|:------:| :---------------------: | :-------------------: |:---------------------------:|
+| HAPPO  | √                       | √                     |              √              |
+| HATRPO | √                       | √                     |                             |
+| HAA2C  | √                       | √                     |              √              |
+| HADDPG | √                       |                       |                             |
+| HATD3  | √                       |                       |                             |
+| HASAC  | √                       | √                     |              √              |
+| HAD3QN |                         | √                     |                             |
+| MAPPO  | √                       | √                     |              √              |
+| MADDPG | √                       |                       |                             |
 
 
 
