@@ -14,13 +14,12 @@ LOG_STD_MIN = -20
 class SquashedGaussianPolicy(nn.Module):
     """Squashed Gaussian policy network for HASAC."""
 
-    def __init__(self, args, obs_space, action_space, act_limit, device=torch.device("cpu")):
+    def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
         """Initialize SquashedGaussianPolicy model.
         Args:
             args: (dict) arguments containing relevant model information.
             obs_space: (gym.Space) observation space.
             action_space: (gym.Space) action space.
-            act_limit: (float) action limit for clamping (assumes all dimensions share the same bound).
             device: (torch.device) specifies the device to run on (cpu/gpu).
         """
         super().__init__()
@@ -41,7 +40,7 @@ class SquashedGaussianPolicy(nn.Module):
         self.net = PlainMLP([feature_dim] + list(hidden_sizes), activation_func, final_activation_func)
         self.mu_layer = nn.Linear(hidden_sizes[-1], act_dim)
         self.log_std_layer = nn.Linear(hidden_sizes[-1], act_dim)
-        self.act_limit = act_limit
+        self.act_limit = action_space.high[0]  # action limit for clamping (assumes all dimensions share the same bound)
         self.to(device)
 
     def forward(self, obs, stochastic=True, with_logprob=True):

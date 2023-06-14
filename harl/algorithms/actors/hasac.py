@@ -16,8 +16,7 @@ class HASAC(OffPolicyBase):
         self.action_type = act_space.__class__.__name__
 
         if act_space.__class__.__name__ == "Box":
-            act_limit = act_space.high[0]
-            self.actor = SquashedGaussianPolicy(args, obs_space, act_space, act_limit, device)
+            self.actor = SquashedGaussianPolicy(args, obs_space, act_space, device)
         else:
             self.actor = DiscretePolicy(args, obs_space, act_space, device)
 
