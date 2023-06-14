@@ -50,7 +50,7 @@ Bi-DexterousHands depend on IsaacGym. The hardware requirements of IsaacGym has 
 To install LAG, run the following command:
 ```shell
 # Install dependencies
-pip install torch pymap3d jsbsim==1.1.6 geographiclib gym==0.20.0 wandb icecream setproctitle
+pip install torch pymap3d jsbsim==1.1.6 geographiclib gym==0.21.0 wandb icecream setproctitle
 # Initialize submodules(*JSBSim-Team/jsbsim*)
 git submodule init
 git submodule update

@@ -1,4 +1,3 @@
-import socket
 from absl import flags
 from harl.envs.smac.smac_logger import SMACLogger
 from harl.envs.smacv2.smacv2_logger import SMACv2Logger

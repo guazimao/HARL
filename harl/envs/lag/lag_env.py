@@ -44,21 +44,21 @@ class LAGEnv:
         pass
 
     def render(self):
-        self.env.render(mode='txt', filepath='Noweapon.txt.acmi')
+        self.env.render(mode='txt', filepath='render.txt.acmi')
 
     def close(self):
         self.env.close()
 
     def get_env(self, env_args):
-        if env_args["task"] == "SingleCombat":
-            env = SingleCombatEnv(env_args["scenario"])
-        elif env_args["task"] == "SingleControl":
-            env = SingleControlEnv(env_args["scenario"])
-        elif env_args["task"] == "MultipleCombat":
-            env = MultipleCombatEnv(env_args["scenario"])
+        if env_args["scenario"] == "SingleCombat":
+            env = SingleCombatEnv(env_args["task"])
+        elif env_args["scenario"] == "SingleControl":
+            env = SingleControlEnv(env_args["task"])
+        elif env_args["scenario"] == "MultipleCombat":
+            env = MultipleCombatEnv(env_args["task"])
         else:
             print("Can not support the " +
-                  env_args["task"] + "environment.")
+                  env_args["scenario"] + "environment.")
             raise NotImplementedError
         return env
 
