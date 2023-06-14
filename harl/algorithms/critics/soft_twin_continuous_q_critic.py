@@ -9,6 +9,9 @@ from harl.utils.envs_tools import check
 class SoftTwinContinuousQCritic(TwinContinuousQCritic):
     """Soft Twin Continuous Q Critic.
     Critic that learns two soft Q-functions. The action space can be continuous and discrete.
+    Note that the name SoftTwinContinuousQCritic does not indicate its compatibility with continuous action space but
+    rather emphasizes its structure that outputs the q value given observations and actions provided as inputs. Thus, it
+    is applicable to both continuous and discrete action space.
     """
 
     def __init__(self, args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu")):
