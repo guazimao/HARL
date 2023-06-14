@@ -335,8 +335,10 @@ class OffPolicyBaseRunner:
         for i in range(self.algo_args['train']['n_rollout_threads']):
             if dones_env[i]:
                 self.agent_deaths = np.zeros((self.algo_args['train']['n_rollout_threads'], self.num_agents, 1))
-                next_obs[i] = infos[i][0]["original_obs"].copy()
-                next_share_obs[i] = infos[i][0]["original_state"].copy()
+                if "original_obs" in infos[i][0]:
+                    next_obs[i] = infos[i][0]["original_obs"].copy()
+                if "original_state" in infos[i][0]:
+                    next_share_obs[i] = infos[i][0]["original_state"].copy()
 
         if self.state_type == "EP":
             data = (
