@@ -18,6 +18,7 @@ class TwinContinuousQCritic:
         self.act_space = act_space
         self.num_agents = num_agents
         self.state_type = state_type
+        self.action_type = act_space[0].__class__.__name__
         self.critic = ContinuousQNet(args, share_obs_space, act_space, device)
         self.critic2 = ContinuousQNet(args, share_obs_space, act_space, device)
         self.target_critic = deepcopy(self.critic)

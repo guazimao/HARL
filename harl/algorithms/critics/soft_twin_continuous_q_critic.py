@@ -1,13 +1,9 @@
 """Soft Twin Continuous Q Critic."""
 import numpy as np
 import torch
-from copy import deepcopy
-from harl.models.value_function_models.continuous_q_net import ContinuousQNet
 from harl.algorithms.critics.twin_continuous_q_critic import TwinContinuousQCritic
 import torch.nn.functional as F
 from harl.utils.envs_tools import check
-from harl.utils.models_tools import update_linear_schedule
-import itertools
 
 
 class SoftTwinContinuousQCritic(TwinContinuousQCritic):
@@ -17,7 +13,8 @@ class SoftTwinContinuousQCritic(TwinContinuousQCritic):
 
     def __init__(self, args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu")):
         """Initialize the critic."""
-        super().__init__(args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu"))
+        super(SoftTwinContinuousQCritic, self).__init__(args, share_obs_space, act_space, num_agents, state_type, device)
+
         self.tpdv_a = dict(dtype=torch.int64, device=device)
         self.auto_alpha = args['auto_alpha']
         if self.auto_alpha:
