@@ -10,9 +10,10 @@ from harl.utils.models_tools import update_linear_schedule, mse_loss
 class TwinContinuousQCritic:
     """Twin Continuous Q Critic.
     Critic that learns two Q-functions. The action space is continuous.
-    Note that the name TwinContinuousQCritic does not indicate its compatibility with continuous action space but rather
-    emphasizes its structure that outputs the q value given observations and actions provided as inputs. For now, it only
-    supports continuous action space, but we will enhance its capability to include discrete action space in the future.
+    Note that the name TwinContinuousQCritic emphasizes its structure that takes observations and actions as input and
+    outputs the q values. Thus, it is commonly used to handle continuous action space; meanwhile, it can also be used in
+    discrete action space. For now, it only supports continuous action space, but we will enhance its capability to
+    include discrete action space in the future.
     """
 
     def __init__(self, args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu")):

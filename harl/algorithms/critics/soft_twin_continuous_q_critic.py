@@ -1,6 +1,7 @@
 """Soft Twin Continuous Q Critic."""
 import numpy as np
 import torch
+import torch.nn.functional as F
 from harl.algorithms.critics.twin_continuous_q_critic import TwinContinuousQCritic
 from harl.utils.envs_tools import check
 from harl.utils.models_tools import huber_loss, mse_loss
@@ -9,9 +10,9 @@ from harl.utils.models_tools import huber_loss, mse_loss
 class SoftTwinContinuousQCritic(TwinContinuousQCritic):
     """Soft Twin Continuous Q Critic.
     Critic that learns two soft Q-functions. The action space can be continuous and discrete.
-    Note that the name SoftTwinContinuousQCritic does not indicate its compatibility with continuous action space but
-    rather emphasizes its structure that outputs the q value given observations and actions provided as inputs. Thus, it
-    is applicable to both continuous and discrete action space.
+    Note that the name SoftTwinContinuousQCritic emphasizes its structure that takes observations and actions as input
+    and outputs the q values. Thus, it is commonly used to handle continuous action space; meanwhile, it can also be
+    used in discrete action space.
     """
 
     def __init__(self, args, share_obs_space, act_space, num_agents, state_type, device=torch.device("cpu")):

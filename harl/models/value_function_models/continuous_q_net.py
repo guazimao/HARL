@@ -22,9 +22,9 @@ def get_combined_dim(cent_obs_feature_dim, act_spaces):
 
 class ContinuousQNet(nn.Module):
     """Q Network for continuous and discrete action space. Outputs the q value given global states and actions.
-    Note that the name ContinuousQNet does not indicate its compatibility with continuous action space but rather
-    emphasizes its structure that outputs the q value given observations and actions provided as inputs. Thus, it is
-    applicable to both continuous and discrete action space.
+    Note that the name ContinuousQNet emphasizes its structure that takes observations and actions as input and outputs
+    the q values. Thus, it is commonly used to handle continuous action space; meanwhile, it can also be used in
+    discrete action space.
     """
 
     def __init__(self, args, cent_obs_space, act_spaces, device=torch.device("cpu")):
