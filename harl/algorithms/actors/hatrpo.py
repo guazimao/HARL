@@ -25,7 +25,7 @@ class HATRPO(OnPolicyBase):
             device: (torch.device) device to use for tensor operations.
         """
         assert (
-                act_space.__class__.__name__ == "Box" or "Discrete"
+                act_space.__class__.__name__ != "MultiDiscrete"
         ), "only continuous and discrete action space is supported by HATRPO."
         super(HATRPO, self).__init__(args, obs_space, act_space, device)
 
