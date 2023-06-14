@@ -217,13 +217,13 @@ class OffPolicyBaseRunner:
                 share_obs,
                 obs.transpose(1, 0, 2),
                 actions.transpose(1, 0, 2),
-                available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None,
+                available_actions.transpose(1, 0, 2) if len(np.array(available_actions).shape) == 3 else None,
                 rewards,
                 dones,
                 infos,
                 next_share_obs,
                 next_obs,
-                next_available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None
+                next_available_actions.transpose(1, 0, 2) if len(np.array(available_actions).shape) == 3 else None
             )
             self.insert(data)
             obs = new_obs
@@ -275,13 +275,13 @@ class OffPolicyBaseRunner:
                 share_obs,
                 obs.transpose(1, 0, 2),
                 actions.transpose(1, 0, 2),
-                available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None,
+                available_actions.transpose(1, 0, 2) if len(np.array(available_actions).shape) == 3 else None,
                 rewards,
                 dones,
                 infos,
                 next_share_obs,
                 next_obs,
-                next_available_actions.transpose(1, 0, 2) if len(available_actions.shape) == 3 else None
+                next_available_actions.transpose(1, 0, 2) if len(np.array(available_actions).shape) == 3 else None
             )
             self.insert(data)
             obs = new_obs
